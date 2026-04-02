@@ -16,22 +16,26 @@
   type TestRow = { row: number; to: string };
 
   let {
+    initiallyOpen = true,
     testRows = [],
     testRow = $bindable(""),
     testAddress = $bindable(""),
     testStatus = "",
     onSendTest,
   }: {
+    initiallyOpen?: boolean;
     testRows?: TestRow[];
     testRow?: string;
     testAddress?: string;
     testStatus?: string;
     onSendTest: () => void;
   } = $props();
+
+  let open = $state(initiallyOpen);
 </script>
 
 <Accordion>
-  <details open>
+  <details bind:open={open}>
     <summary>Send Test Email</summary>
 
     <Stack>

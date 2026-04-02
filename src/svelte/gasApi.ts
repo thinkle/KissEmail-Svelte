@@ -19,7 +19,7 @@ export const GoogleAppsScript = {
       });
     },
 
-     saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; }): Promise<import("../shared/mailMerge").MailMergeConfig> {
+     saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; autoCheckReceipts: boolean; }): Promise<import("../shared/mailMerge").MailMergeConfig> {
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler((result: import("../shared/mailMerge").MailMergeConfig) => resolve(result))

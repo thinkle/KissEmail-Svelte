@@ -6,7 +6,7 @@ declare namespace google.script {
       withUserObject(object: Object): this;
       getActiveUserEmail(): void;
   loadSheetInfo(): void;
-  saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; }): void;
+  saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; autoCheckReceipts: boolean; }): void;
   checkEmailReceipts(sheetName: string): void;
   debugReceiptTracking(receiptId: string): void;
   saveMailMergeTemplate(template: string): void;

@@ -37,6 +37,7 @@ export function saveMailMergeConfig(
     useMergeIf: boolean;
     mergeFormula: string;
     trackReceipt: boolean;
+    autoCheckReceipts: boolean;
   }
 ): MailMergeConfig {
   return saveConfig(settings);

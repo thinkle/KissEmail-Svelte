@@ -11,6 +11,7 @@ export interface MailMergeConfig {
   useMergeIf: boolean;
   mergeFormula: string;
   trackReceipt: boolean;
+  autoCheckReceipts: boolean;
 }
 
 export interface SaveMailMergeConfigInput {
@@ -23,6 +24,7 @@ export interface SaveMailMergeConfigInput {
   useMergeIf: boolean;
   mergeFormula: string;
   trackReceipt: boolean;
+  autoCheckReceipts: boolean;
 }
 
 export interface ReceiptStatus {
@@ -37,12 +39,27 @@ export interface CheckReceiptsResult {
   pending: number;
 }
 
+export interface AutoReceiptStatus {
+  enabled: boolean;
+  lastCheckedAt?: string;
+  lastCheckedPending?: number;
+  lastError?: string;
+}
+
+export interface ReceiptSummary {
+  tracked: number;
+  opened: number;
+  pending: number;
+}
+
 export interface SheetInfo {
   headers: string[];
   config: MailMergeConfig;
   sampleRows: SerializableCellValue[][];
   quota: number;
   sheet: string;
+  autoReceiptStatus?: AutoReceiptStatus;
+  receiptSummary?: ReceiptSummary;
 }
 
 export interface TestRow {

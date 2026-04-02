@@ -1,4 +1,9 @@
-import type { MailMergeConfig, MailMergeResult, CheckReceiptsResult } from "../shared/mailMerge";
+import type {
+  CheckReceiptsResult,
+  MailMergeConfig,
+  MailMergeResult,
+  ReceiptSummary,
+} from "../shared/mailMerge";
 import { embedTrackingPixel, sendEmailFromTemplate } from "./emailer";
 import { TRACKING_URL } from "./trackingConfig";
 import { Table } from "./tableReader";
@@ -219,6 +224,47 @@ export function checkEmailReceipts(
   }
 
   return { checked, received, pending };
+}
+
+export function summarizeReceiptTracking(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet
+): ReceiptSummary {
+  const dataRange = sheet.getDataRange();
+  const allValues = dataRange.getValues();
+
+  if (allValues.length === 0) {
+    return { tracked: 0, opened: 0, pending: 0 };
+  }
+
+  const headers = allValues[0].map(String);
+  const receiptIdCol = headers.indexOf(MAIL_MERGE_RECEIPT_ID_COLUMN);
+  const statusCol = headers.indexOf(MAIL_MERGE_STATUS_COLUMN);
+
+  if (receiptIdCol === -1) {
+    return { tracked: 0, opened: 0, pending: 0 };
+  }
+
+  let tracked = 0;
+  let opened = 0;
+
+  for (let rowIndex = 1; rowIndex < allValues.length; rowIndex += 1) {
+    const receiptId = String(allValues[rowIndex][receiptIdCol] ?? "").trim();
+    if (!receiptId) {
+      continue;
+    }
+
+    tracked += 1;
+    const status = statusCol === -1 ? "" : String(allValues[rowIndex][statusCol] ?? "");
+    if (status.startsWith(STATUS_OPENED_PREFIX)) {
+      opened += 1;
+    }
+  }
+
+  return {
+    tracked,
+    opened,
+    pending: Math.max(tracked - opened, 0),
+  };
 }
 
 function fetchReceiptStatusBatch(

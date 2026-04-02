@@ -13,8 +13,10 @@
     Tag,
   } from "contain-css-svelte";
   import type {
+    AutoReceiptStatus,
     MailMergeConfig,
     CheckReceiptsResult,
+    ReceiptSummary,
     SaveMailMergeConfigInput,
     SheetInfo,
     TestRow,
@@ -47,6 +49,7 @@
     useMergeIf: false,
     mergeFormula: "",
     trackReceipt: true,
+    autoCheckReceipts: false,
   });
 
   let ui = $state({
@@ -86,6 +89,13 @@
 
   let receiptResult = $state<CheckReceiptsResult | null>(null);
   let receiptChecking = $state(false);
+  let autoReceiptStatus = $state<AutoReceiptStatus>({ enabled: false });
+  let receiptSummary = $state<ReceiptSummary>({ tracked: 0, opened: 0, pending: 0 });
+  let configOpen = $state(true);
+  let templateOpen = $state(true);
+  let testOpen = $state(false);
+  let receiptsOpen = $state(false);
+  let accordionStateInitialized = $state(false);
 
   let templatePollTimer: ReturnType<typeof setTimeout> | undefined;
   let templatePollBaseline = $state("");
@@ -134,9 +144,36 @@
     sheetData.sampleRows = info.sampleRows ?? [];
     sheetData.quota = info.quota ?? 0;
     sheetData.sheet = info.sheet ?? "";
+    autoReceiptStatus = info.autoReceiptStatus ?? { enabled: false };
+    receiptSummary = info.receiptSummary ?? { tracked: 0, opened: 0, pending: 0 };
     config = { ...emptyConfig(), ...(info.config ?? emptyConfig()) };
     mergeCondition = mergeConditionFromConfig(sheetData.headers, config);
     ui.editing = !configIsReady(config);
+
+    if (!accordionStateInitialized) {
+      const isReady = configIsReady(config);
+      const hasTemplate = Boolean(config.template?.trim());
+      const tracked = info.receiptSummary?.tracked ?? 0;
+
+      if (tracked > 0) {
+        configOpen = false;
+        templateOpen = false;
+        testOpen = false;
+        receiptsOpen = true;
+      } else if (isReady) {
+        configOpen = false;
+        templateOpen = true;
+        testOpen = true;
+        receiptsOpen = false;
+      } else {
+        configOpen = true;
+        templateOpen = !hasTemplate;
+        testOpen = false;
+        receiptsOpen = false;
+      }
+
+      accordionStateInitialized = true;
+    }
   }
 
   async function loadSheetInfo(showBusyMessage?: string) {
@@ -195,6 +232,7 @@
       useMergeIf: config.useMergeIf,
       mergeFormula: computedConfig.mergeFormula,
       trackReceipt: config.trackReceipt,
+      autoCheckReceipts: config.trackReceipt ? config.autoCheckReceipts : false,
     };
 
     setBusy("Saving configuration...");
@@ -308,10 +346,40 @@
     try {
       receiptResult = await GoogleAppsScript.checkEmailReceipts(sheetData.sheet);
       ui.errorMessage = "";
+      await loadSheetInfo();
     } catch (error) {
       ui.errorMessage = formatError(error);
     } finally {
       receiptChecking = false;
+      clearBusy();
+    }
+  }
+
+  async function enableAutoReceiptChecks() {
+    if (!config.trackReceipt || config.autoCheckReceipts) {
+      return;
+    }
+
+    setBusy("Turning on hourly receipt checks...");
+    try {
+      await GoogleAppsScript.saveMailMergeConfig({
+        jobName: config.jobName,
+        headerRows: config.headerRows,
+        to: config.to,
+        cc: config.cc,
+        bcc: config.bcc,
+        subject: config.subject,
+        useMergeIf: config.useMergeIf,
+        mergeFormula: computedConfig.mergeFormula,
+        trackReceipt: true,
+        autoCheckReceipts: true,
+      });
+      config.autoCheckReceipts = true;
+      ui.errorMessage = "";
+      await refreshSidebar();
+    } catch (error) {
+      ui.errorMessage = formatError(error);
+    } finally {
       clearBusy();
     }
   }
@@ -388,6 +456,7 @@
       email={ui.email}
       loading={ui.loading}
       editing={ui.editing}
+      initiallyOpen={configOpen}
       bind:jobName={config.jobName}
       bind:sheet={sheetData.sheet}
       bind:headerRows={config.headerRows}
@@ -404,12 +473,13 @@
       bind:mergeCondition
       {specialConditions}
       bind:trackReceipt={config.trackReceipt}
+      bind:autoCheckReceipts={config.autoCheckReceipts}
       onSaveConfig={saveConfig}
       onToggleEdit={() => (ui.editing = !ui.editing)}
     />
 
     <Accordion>
-      <details open>
+      <details bind:open={templateOpen}>
         <summary>Email Template</summary>
         <TemplateEditor
           mode="sidebar"
@@ -422,6 +492,7 @@
     </Accordion>
 
     <TestPanel
+      initiallyOpen={testOpen}
       testRows={test.rows}
       bind:testRow={test.row}
       bind:testAddress={test.address}
@@ -431,9 +502,13 @@
 
     <ReceiptPanel
       trackReceipt={config.trackReceipt}
+      initiallyOpen={receiptsOpen}
+      receiptSummary={receiptSummary}
+      autoReceiptStatus={autoReceiptStatus}
       loading={receiptChecking}
       result={receiptResult}
       onCheckReceipts={checkReceipts}
+      onEnableAutoCheck={enableAutoReceiptChecks}
     />
 
     <FooterBar {ready} merging={ui.merging} onMerge={doMerge} />

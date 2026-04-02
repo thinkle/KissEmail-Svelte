@@ -1,11 +1,13 @@
 import type { CheckReceiptsResult, MailMergeConfig, SheetInfo } from "../../shared/mailMerge";
+import type { ReceiptDebugResult } from "../../gas/mailMerge";
 import {
-  mockConfig,
-  mockMergeResult,
-  mockSendTestResult,
-  mockSheetInfo,
-  mockTestRows,
-} from "../lib/mockMailMerge";
+  createMockScenarioState,
+  makeMockSendTestResult,
+  updateMockStateAfterReceiptCheck,
+  updateMockStateForSavedConfig,
+} from "./mockScenarios";
+
+const state = createMockScenarioState();
 
 function openMockDialog() {
   if (typeof window === "undefined") {
@@ -15,11 +17,11 @@ function openMockDialog() {
 }
 
 export function getActiveUserEmail(): string {
-  return "thinkle@example.com";
+  return state.activeUserEmail;
 }
 
 export function loadSheetInfo(): SheetInfo {
-  return mockSheetInfo();
+  return structuredClone(state.sheetInfo);
 }
 
 export function saveMailMergeConfig(settings: {
@@ -32,33 +34,30 @@ export function saveMailMergeConfig(settings: {
   useMergeIf: boolean;
   mergeFormula: string;
   trackReceipt: boolean;
+  autoCheckReceipts: boolean;
 }): MailMergeConfig {
-  return {
-    ...mockConfig,
-    ...settings,
-  };
+  updateMockStateForSavedConfig(state, settings);
+  return structuredClone(state.sheetInfo.config);
 }
 
 export function saveMailMergeTemplate(template: string): SheetInfo {
-  return {
-    ...mockSheetInfo(),
-    config: {
-      ...mockConfig,
-      template,
-    },
+  state.sheetInfo.config = {
+    ...state.sheetInfo.config,
+    template,
   };
+  return structuredClone(state.sheetInfo);
 }
 
 export function loadTestRows() {
-  return mockTestRows();
+  return structuredClone(state.testRows);
 }
 
 export function sendMailMergeTestEmail(rowNumber: number, testAddress: string) {
-  return mockSendTestResult(rowNumber, testAddress);
+  return makeMockSendTestResult(rowNumber, testAddress);
 }
 
 export function runMailMerge(_sheetName: string) {
-  return mockMergeResult();
+  return structuredClone(state.mergeResult);
 }
 
 export function openEditorDialog(): void {
@@ -67,10 +66,11 @@ export function openEditorDialog(): void {
 
 
 export function checkEmailReceipts(_sheetName?: string): CheckReceiptsResult {
-  return { checked: 3, received: 1, pending: 2 };
+  updateMockStateAfterReceiptCheck(state);
+  return structuredClone(state.checkReceiptsResult);
 }
 
-export function debugReceiptTracking(receiptId: string): import("/Users/thinkle/BackedUpProjects/gas/KissEmail-Svelte/src/gas/mailMerge").ReceiptDebugResult {
+export function debugReceiptTracking(receiptId: string): ReceiptDebugResult {
   return {
     receiptId,
     url: `https://kiss-email-receipts.tmhinkle.workers.dev/status/${receiptId}`,

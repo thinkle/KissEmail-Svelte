@@ -35,6 +35,7 @@
     email,
     loading = false,
     editing = true,
+    initiallyOpen = true,
     jobName = $bindable(""),
     sheet = $bindable(""),
     headerRows = $bindable(1),
@@ -51,12 +52,14 @@
     mergeCondition = $bindable<MergeCondition>(),
     specialConditions = [],
     trackReceipt = $bindable(false),
+    autoCheckReceipts = $bindable(false),
     onSaveConfig,
     onToggleEdit,
   }: {
     email?: string | undefined;
     loading?: boolean;
     editing?: boolean;
+    initiallyOpen?: boolean;
     jobName?: string;
     sheet?: string;
     headerRows?: number;
@@ -73,9 +76,12 @@
     mergeCondition: MergeCondition;
     specialConditions?: SpecialCondition[];
     trackReceipt?: boolean;
+    autoCheckReceipts?: boolean;
     onSaveConfig: () => void;
     onToggleEdit: () => void;
   } = $props();
+
+  let open = $state(initiallyOpen);
 
   const needsValue = (formula: string) =>
     specialConditions.find((c) => c.formula === formula)?.needsValue ?? false;
@@ -116,7 +122,7 @@
 </script>
 
 <Accordion>
-  <details open>
+  <details bind:open={open}>
     <summary>Configuration</summary>
 
     {#if loading}
@@ -312,7 +318,20 @@
       <Fieldset>
         {#snippet legend()}Receipt Tracking{/snippet}
         <Stack>
-          <Checkbox bind:checked={trackReceipt}>Track email opens (1×1 pixel)</Checkbox>
+          <Checkbox
+            checked={trackReceipt}
+            onchange={(event) => {
+              trackReceipt = (event.currentTarget as HTMLInputElement).checked;
+              if (!trackReceipt) {
+                autoCheckReceipts = false;
+              }
+            }}
+          >
+            Track email opens (1×1 pixel)
+          </Checkbox>
+          <Checkbox bind:checked={autoCheckReceipts} disabled={!trackReceipt}>
+            Automatically check receipts hourly
+          </Checkbox>
           <details>
             <summary style="cursor:pointer;font-size:0.85em;color:#666;">About tracking</summary>
             <p style="font-size:0.85em;color:#555;margin:0.5em 0 0;">
@@ -372,6 +391,10 @@
           <tr>
             <th>Receipt Tracking</th>
             <td>{trackReceipt ? "enabled" : "disabled"}</td>
+          </tr>
+          <tr>
+            <th>Auto Check</th>
+            <td>{trackReceipt && autoCheckReceipts ? "hourly" : "off"}</td>
           </tr>
           <tr>
             <th>Merge Rows</th>

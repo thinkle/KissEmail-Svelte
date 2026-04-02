@@ -9,7 +9,13 @@ import type {
 } from "../shared/mailMerge";
 import { ConfigurationSheet } from "./configurationSheet";
 import { applyTemplate, sendEmailFromTemplate } from "./emailer";
-import { checkEmailReceipts, debugReceiptStatus, doMailMerge } from "./mailMerge";
+import {
+  checkEmailReceipts,
+  debugReceiptStatus,
+  doMailMerge,
+  summarizeReceiptTracking,
+} from "./mailMerge";
+import { getAutoReceiptStatus, syncAutoReceiptMonitoring } from "./receiptScheduler";
 import { Table } from "./tableReader";
 import { TRACKING_URL } from "./trackingConfig";
 import { cleanupObject } from "./utils";
@@ -43,6 +49,7 @@ function getDefaultConfig(sheetName: string): MailMergeConfig {
     useMergeIf: false,
     mergeFormula: "",
     trackReceipt: true,
+    autoCheckReceipts: false,
   };
 }
 
@@ -63,6 +70,7 @@ function toMailMergeConfig(sheetName: string, rawConfig: Record<string, unknown>
     mergeFormula:
       typeof rawConfig.mergeFormula === "string" ? rawConfig.mergeFormula : defaults.mergeFormula,
     trackReceipt: Boolean(rawConfig.trackReceipt),
+    autoCheckReceipts: Boolean(rawConfig.trackReceipt && rawConfig.autoCheckReceipts),
   };
 }
 
@@ -137,19 +145,23 @@ export function getSheetInfo(): SheetInfo {
     sampleRows: cleanupObject(getSampleRows(config.headerRows)) as SheetInfo["sampleRows"],
     quota: MailApp.getRemainingDailyQuota(),
     sheet: sheet.getName(),
+    autoReceiptStatus: getAutoReceiptStatus(sheet, config),
+    receiptSummary: summarizeReceiptTracking(sheet),
   };
   return cleanupObject(info) as SheetInfo;
 }
 
 export function saveConfig(settings: SaveMailMergeConfigInput): MailMergeConfig {
   const configSheet = getMergeSettings();
+  const sheet = getDataSheet();
   configSheet.table = {
     ...configSheet.table,
     ...settings,
   };
   configSheet.writeConfigurationTable();
-  const sheet = getDataSheet();
-  return toMailMergeConfig(sheet.getName(), configSheet.table);
+  const nextConfig = toMailMergeConfig(sheet.getName(), configSheet.table);
+  syncAutoReceiptMonitoring(sheet, nextConfig);
+  return nextConfig;
 }
 
 export function saveTemplate(template: string): SheetInfo {
@@ -255,7 +267,9 @@ export function doMerge(sheetName?: string): MailMergeResult {
     throw new Error("Missing template, recipient, or subject. Open the sidebar and save configuration first.");
   }
 
-  return doMailMerge(sheet, config);
+  const result = doMailMerge(sheet, config);
+  syncAutoReceiptMonitoring(sheet, config);
+  return result;
 }
 
 export function checkReceipts(sheetName?: string): CheckReceiptsResult {
