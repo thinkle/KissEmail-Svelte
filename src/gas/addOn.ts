@@ -14,6 +14,8 @@ export function onOpen(_e: GoogleAppsScript.Events.SheetsOnOpen) {
       .addItem("Configure Mail Merge", "showSidebar")
       .addItem("Edit Email Template", "showDialog")
       .addItem("Run Mail Merge", "runMailMerge")
+      .addSeparator()
+      .addItem("About KISS Mail Merge", "showAbout")
       .addToUi();
   }
 }

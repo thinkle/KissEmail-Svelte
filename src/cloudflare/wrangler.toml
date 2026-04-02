@@ -1,0 +1,8 @@
+name = "kiss-email-receipts"
+main = "worker.ts"
+compatibility_date = "2024-01-01"
+
+[[kv_namespaces]]
+binding = "RECEIPTS"
+id = "569f7034b5d541a9b6aed78681b61777"
+preview_id = "f18d4e563ef4473789d0da29ab0b06d6"

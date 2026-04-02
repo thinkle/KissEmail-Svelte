@@ -14,7 +14,7 @@
 
 <Card>
   <Inline gap="0.75rem" wrap="wrap" align="center">
-    <Button primary onclick={onMerge} disabled={!ready}>
+    <Button danger onclick={onMerge} disabled={!ready}>
       {merging ? "Merging..." : "Do Merge"}
     </Button>
     Template ready: {ready ? "yes" : "no"}

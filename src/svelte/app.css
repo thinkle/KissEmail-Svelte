@@ -7,14 +7,17 @@
   --card-margin: 2px;
   --bar-border-bottom: none;
   --bar-border-top: none;
-  --control-bg: var(--material-color-pink-800);
-  --control-fg: var(--material-color-pink-50);
+  --shadow-color: #99009944;
+  --button-bg: white;
+  --button-fg: var(--material-color-purple-800);
   --stack-line-width: 100%; /* Workaround bug */
   --hover-color-mix: #cc2222;
   --hover-base-color-percentage: 55%;
   --button-padding: 8px 4px;
   --select-padding: var(--button-padding);
   --button-border-radius: 16px;
+  --control-bg: var(--material-color-purple-50);
+  --menu-bg: var(--control-bg);
 }
 
 body {

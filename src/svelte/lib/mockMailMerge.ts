@@ -16,6 +16,7 @@ export const mockConfig: MailMergeConfig = {
   template: "<p>Hi {{FirstName}},</p><p>This is a mock preview email.</p>",
   useMergeIf: false,
   mergeFormula: "",
+  trackReceipt: true,
 };
 
 export const mockSheetInfo = (): SheetInfo => ({

@@ -1,4 +1,5 @@
 import type {
+  CheckReceiptsResult,
   MailMergeConfig,
   SendTestEmailResult,
   SheetInfo,
@@ -8,11 +9,27 @@ import type {
 } from "../shared/mailMerge";
 import { ConfigurationSheet } from "./configurationSheet";
 import { applyTemplate, sendEmailFromTemplate } from "./emailer";
-import { doMailMerge } from "./mailMerge";
+import { checkEmailReceipts, doMailMerge } from "./mailMerge";
 import { Table } from "./tableReader";
-import { cleanupObject, getCurrentRange } from "./utils";
+import { TRACKING_URL } from "./trackingConfig";
+import { cleanupObject } from "./utils";
 
 const CONFIG_SHEET_SUFFIX = " Mail Merge Config";
+
+/**
+ * Returns the active sheet, but if the user has a config sheet open,
+ * redirects to the source data sheet so we don't treat config rows as data.
+ */
+function getDataSheet(): GoogleAppsScript.Spreadsheet.Sheet {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const active = spreadsheet.getActiveSheet();
+  if (active.getName().endsWith(CONFIG_SHEET_SUFFIX)) {
+    const sourceName = active.getName().slice(0, -CONFIG_SHEET_SUFFIX.length);
+    const sourceSheet = spreadsheet.getSheetByName(sourceName);
+    if (sourceSheet) return sourceSheet;
+  }
+  return active;
+}
 
 function getDefaultConfig(sheetName: string): MailMergeConfig {
   return {
@@ -25,6 +42,7 @@ function getDefaultConfig(sheetName: string): MailMergeConfig {
     template: "",
     useMergeIf: false,
     mergeFormula: "",
+    trackReceipt: true,
   };
 }
 
@@ -44,22 +62,21 @@ function toMailMergeConfig(sheetName: string, rawConfig: Record<string, unknown>
     useMergeIf: Boolean(rawConfig.useMergeIf),
     mergeFormula:
       typeof rawConfig.mergeFormula === "string" ? rawConfig.mergeFormula : defaults.mergeFormula,
+    trackReceipt: Boolean(rawConfig.trackReceipt),
   };
 }
 
-function getHeaderRange() {
-  const range = getCurrentRange();
-  return range.getSheet().getRange(range.getRow(), range.getColumn(), 1, range.getNumColumns());
-}
-
 function getColumnHeaders(): string[] {
-  return getHeaderRange()
+  const sheet = getDataSheet();
+  const dataRange = sheet.getDataRange();
+  return sheet
+    .getRange(dataRange.getRow(), dataRange.getColumn(), 1, dataRange.getNumColumns())
     .getValues()[0]
     .map((header) => String(header ?? ""));
 }
 
 function getSampleRows(headerRows: number): unknown[][] {
-  const dataRange = getCurrentRange().getSheet().getDataRange();
+  const dataRange = getDataSheet().getDataRange();
   const startRow = dataRange.getRow() + headerRows;
   const availableRows = dataRange.getLastRow() - startRow + 1;
   if (availableRows <= 0) {
@@ -104,14 +121,14 @@ export function setupMergeConfig(
 }
 
 export function getMergeSettings() {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getActiveSheet();
+  const sheet = getDataSheet();
   const configurationSheet = setupMergeConfig(sheet);
   configurationSheet.table = toMailMergeConfig(sheet.getName(), configurationSheet.table);
   return configurationSheet;
 }
 
 export function getSheetInfo(): SheetInfo {
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getDataSheet();
   const configSheet = getMergeSettings();
   const config = toMailMergeConfig(sheet.getName(), configSheet.table);
   const info: SheetInfo = {
@@ -131,12 +148,12 @@ export function saveConfig(settings: SaveMailMergeConfigInput): MailMergeConfig 
     ...settings,
   };
   configSheet.writeConfigurationTable();
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getDataSheet();
   return toMailMergeConfig(sheet.getName(), configSheet.table);
 }
 
 export function saveTemplate(template: string): SheetInfo {
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getDataSheet();
   const configSheet = setupMergeConfig(sheet, template);
   configSheet.table = {
     ...configSheet.table,
@@ -147,7 +164,7 @@ export function saveTemplate(template: string): SheetInfo {
 }
 
 export function getTestRows(limit = 50): TestRow[] {
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getDataSheet();
   const config = getMergeSettings().table as MailMergeConfig;
   const headerRows = Math.max(Number(config.headerRows) || 1, 1);
   const dataRange = sheet.getDataRange();
@@ -192,7 +209,7 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
     throw new Error("Missing template or subject. Please save your configuration and template first.");
   }
 
-  const sheet = SpreadsheetApp.getActiveSheet();
+  const sheet = getDataSheet();
   const dataRange = sheet.getDataRange();
   const rowOffset = dataRange.getRow();
   const headerRows = Math.max(Number(config.headerRows) || 1, 1);
@@ -227,7 +244,7 @@ export function doMerge(sheetName?: string): MailMergeResult {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = sheetName
     ? spreadsheet.getSheetByName(sheetName)
-    : spreadsheet.getActiveSheet();
+    : getDataSheet();
 
   if (!sheet) {
     throw new Error(`Unable to find sheet ${sheetName}`);
@@ -239,4 +256,22 @@ export function doMerge(sheetName?: string): MailMergeResult {
   }
 
   return doMailMerge(sheet, config);
+}
+
+export function checkReceipts(sheetName?: string): CheckReceiptsResult {
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = sheetName
+    ? spreadsheet.getSheetByName(sheetName)
+    : getDataSheet();
+
+  if (!sheet) {
+    throw new Error(`Unable to find sheet ${sheetName}`);
+  }
+
+  const config = toMailMergeConfig(sheet.getName(), getMergeSettings().table as Record<string, unknown>);
+  if (!config.trackReceipt) {
+    throw new Error("Receipt tracking is not enabled. Enable it in the sidebar settings.");
+  }
+
+  return checkEmailReceipts(sheet, TRACKING_URL);
 }

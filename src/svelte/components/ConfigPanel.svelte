@@ -50,6 +50,7 @@
     useMergeIf = $bindable(false),
     mergeCondition = $bindable<MergeCondition>(),
     specialConditions = [],
+    trackReceipt = $bindable(false),
     onSaveConfig,
     onToggleEdit,
   }: {
@@ -71,6 +72,7 @@
     useMergeIf?: boolean;
     mergeCondition: MergeCondition;
     specialConditions?: SpecialCondition[];
+    trackReceipt?: boolean;
     onSaveConfig: () => void;
     onToggleEdit: () => void;
   } = $props();
@@ -123,7 +125,7 @@
       <Stack>
       <Inline gap="0.75rem" wrap="wrap" align="center">
         {email || "loading account..."}
-        <Button secondary onclick={onToggleEdit}>View Summary</Button>
+        <Button onclick={onToggleEdit}>View Summary</Button>
       </Inline>
 
       <Form onsubmit={(event) => event.preventDefault()}>
@@ -307,16 +309,34 @@
         </Stack>
       </Fieldset>
 
+      <Fieldset>
+        {#snippet legend()}Receipt Tracking{/snippet}
+        <Stack>
+          <Checkbox bind:checked={trackReceipt}>Track email opens (1×1 pixel)</Checkbox>
+          <details>
+            <summary style="cursor:pointer;font-size:0.85em;color:#666;">About tracking</summary>
+            <p style="font-size:0.85em;color:#555;margin:0.5em 0 0;">
+              A tiny invisible image is embedded in each email. When the recipient
+              opens it, their email client loads the image and we record the time.
+              <strong>False negatives</strong> are common — many clients block remote
+              images by default. <strong>False positives</strong> can occur from
+              email preview bots or security scanners. Use open dates as a rough
+              signal, not a guarantee.
+            </p>
+          </details>
+        </Stack>
+      </Fieldset>
+
       <Inline gap="0.75rem" wrap="wrap">
         <Button primary onclick={onSaveConfig}>Save Configuration</Button>
-        <Button secondary onclick={onToggleEdit}>View Summary</Button>
+        <Button onclick={onToggleEdit}>View Summary</Button>
       </Inline>
       </Stack>
     {:else}
       <Stack>
       <Inline gap="0.75rem" wrap="wrap" align="center">
         Saved configuration
-        <Button secondary onclick={onToggleEdit}>Edit Config</Button>
+        <Button onclick={onToggleEdit}>Edit Config</Button>
       </Inline>
 
       <Table --table-width="100%">
@@ -348,6 +368,10 @@
           <tr>
             <th>Subject</th>
             <td>{subject}</td>
+          </tr>
+          <tr>
+            <th>Receipt Tracking</th>
+            <td>{trackReceipt ? "enabled" : "disabled"}</td>
           </tr>
           <tr>
             <th>Merge Rows</th>

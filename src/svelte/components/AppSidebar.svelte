@@ -2,6 +2,7 @@
   import { onMount } from "svelte";
   import kissEnvelopeSvg from "../lib/kiss-envelope.svg?raw";
   import {
+    Accordion,
     Button,
     Card,
     Container,
@@ -13,6 +14,7 @@
   } from "contain-css-svelte";
   import type {
     MailMergeConfig,
+    CheckReceiptsResult,
     SaveMailMergeConfigInput,
     SheetInfo,
     TestRow,
@@ -21,6 +23,7 @@
   import BusyOverlay from "./BusyOverlay.svelte";
   import ConfigPanel from "./ConfigPanel.svelte";
   import FooterBar from "./FooterBar.svelte";
+  import ReceiptPanel from "./ReceiptPanel.svelte";
   import TemplateEditor from "./TemplateEditor.svelte";
   import TestPanel from "./TestPanel.svelte";
   import {
@@ -43,6 +46,7 @@
     template: "",
     useMergeIf: false,
     mergeFormula: "",
+    trackReceipt: true,
   });
 
   let ui = $state({
@@ -79,6 +83,9 @@
     address: "",
     status: "",
   });
+
+  let receiptResult = $state<CheckReceiptsResult | null>(null);
+  let receiptChecking = $state(false);
 
   let templatePollTimer: ReturnType<typeof setTimeout> | undefined;
   let templatePollBaseline = $state("");
@@ -187,6 +194,7 @@
       subject: config.subject,
       useMergeIf: config.useMergeIf,
       mergeFormula: computedConfig.mergeFormula,
+      trackReceipt: config.trackReceipt,
     };
 
     setBusy("Saving configuration...");
@@ -294,6 +302,20 @@
     }
   }
 
+  async function checkReceipts() {
+    receiptChecking = true;
+    setBusy("Checking receipts...");
+    try {
+      receiptResult = await GoogleAppsScript.checkEmailReceipts(sheetData.sheet);
+      ui.errorMessage = "";
+    } catch (error) {
+      ui.errorMessage = formatError(error);
+    } finally {
+      receiptChecking = false;
+      clearBusy();
+    }
+  }
+
   async function initializeSidebar() {
     try {
       ui.email = await GoogleAppsScript.getActiveUserEmail();
@@ -381,17 +403,23 @@
       bind:useMergeIf={config.useMergeIf}
       bind:mergeCondition
       {specialConditions}
+      bind:trackReceipt={config.trackReceipt}
       onSaveConfig={saveConfig}
       onToggleEdit={() => (ui.editing = !ui.editing)}
     />
 
-    <TemplateEditor
-      mode="sidebar"
-      headers={sheetData.headers}
-      bind:templateHtml={config.template}
-      {previewHtml}
-      onOpenEditor={openEditor}
-    />
+    <Accordion>
+      <details open>
+        <summary>Email Template</summary>
+        <TemplateEditor
+          mode="sidebar"
+          headers={sheetData.headers}
+          bind:templateHtml={config.template}
+          {previewHtml}
+          onOpenEditor={openEditor}
+        />
+      </details>
+    </Accordion>
 
     <TestPanel
       testRows={test.rows}
@@ -399,6 +427,13 @@
       bind:testAddress={test.address}
       testStatus={test.status}
       onSendTest={sendTestEmail}
+    />
+
+    <ReceiptPanel
+      trackReceipt={config.trackReceipt}
+      loading={receiptChecking}
+      result={receiptResult}
+      onCheckReceipts={checkReceipts}
     />
 
     <FooterBar {ready} merging={ui.merging} onMerge={doMerge} />

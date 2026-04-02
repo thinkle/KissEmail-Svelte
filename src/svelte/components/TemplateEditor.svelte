@@ -666,7 +666,7 @@
   <Bar>
     <Inline wrap="wrap">
       {#if mode === "sidebar"}
-        <Button secondary onclick={onOpenEditor}>Edit Template</Button>
+        <Button onclick={onOpenEditor}>Edit Template</Button>
         <Button onclick={() => (previewOverride = !showPreview)}>
           {showPreview ? "Show Template" : "Show Preview"}
         </Button>
@@ -674,8 +674,10 @@
         <Button onclick={() => (previewOverride = !showPreview)}>
           {showPreview ? "Show Editor" : "Show Preview"}
         </Button>
-        <Button onclick={toggleSource} primary={showSource}>HTML</Button>
-        <Button onclick={toggleSource} primary={!showSource}>WYSIWYG</Button>
+        {#if !showPreview}
+          <Button onclick={toggleSource} primary={showSource}>HTML</Button>
+          <Button onclick={toggleSource} primary={!showSource}>WYSIWYG</Button>
+        {/if}
       {/if}
     </Inline>
 
@@ -684,83 +686,116 @@
     {/if}
   </Bar>
 
-  {#if mode === "editor"}
+  {#if mode === "editor" && !showPreview}
     <Bar>
-      <Inline wrap="wrap" align="center">
-        <MiniButton onclick={() => execEditorCommand("bold")} aria-label="Bold">
-          <span class="toolbar-bold">B</span>
-        </MiniButton>
-        <MiniButton
-          onclick={() => execEditorCommand("italic")}
-          aria-label="Italic"
-        >
-          <span class="toolbar-italic">I</span>
-        </MiniButton>
-        <MiniButton
-          onclick={() => execEditorCommand("underline")}
-          aria-label="Underline"
-        >
-          <span class="toolbar-underline">U</span>
-        </MiniButton>
-        <MiniButton onclick={() => execEditorCommand("justifyLeft")} aria-label="Align left">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path d="M2 3h12v1H2zm0 3h8v1H2zm0 3h12v1H2zm0 3h8v1H2z" fill="currentColor"></path>
-          </svg>
-        </MiniButton>
-        <MiniButton onclick={() => execEditorCommand("justifyCenter")} aria-label="Align center">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path d="M2 3h12v1H2zm2 3h8v1H4zm0 3h8v1H4zm2 3h4v1H6z" fill="currentColor"></path>
-          </svg>
-        </MiniButton>
-        <MiniButton onclick={() => execEditorCommand("justifyRight")} aria-label="Align right">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path d="M2 3h12v1H2zm6 3h6v1H8zm0 3h6v1H8zm-4 3h10v1H4z" fill="currentColor"></path>
-          </svg>
-        </MiniButton>
-        <MiniButton onclick={openLinkTools} aria-label="Insert link">
-          <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
-            <path d="M6.5 10.5 5 12a2.12 2.12 0 0 1-3 0 2.12 2.12 0 0 1 0-3l2.5-2.5a2.12 2.12 0 0 1 3 0l.5.5-.88.88-.5-.5a.88.88 0 0 0-1.24 0L2.88 9.88a.88.88 0 0 0 0 1.24.88.88 0 0 0 1.24 0l1.5-1.5zm3-5L11 4a2.12 2.12 0 0 1 3 0 2.12 2.12 0 0 1 0 3l-2.5 2.5a2.12 2.12 0 0 1-3 0l-.5-.5.88-.88.5.5a.88.88 0 0 0 1.24 0l2.5-2.5a.88.88 0 0 0 0-1.24.88.88 0 0 0-1.24 0l-1.5 1.5zM5.75 8.88l4-4 .88.88-4 4z" fill="currentColor"></path>
-          </svg>
-        </MiniButton>
-        <Button onclick={() => (showTableTools = !showTableTools)}>Table</Button
-        >
-      </Inline>
+      {#if !showSource}
+        <!-- Don't show edit buttons in HTML mode - power users
+     can just write tags ;) -->
+        <Inline wrap="wrap" align="center">
+          <MiniButton
+            onclick={() => execEditorCommand("bold")}
+            aria-label="Bold"
+          >
+            <span class="toolbar-bold">B</span>
+          </MiniButton>
+          <MiniButton
+            onclick={() => execEditorCommand("italic")}
+            aria-label="Italic"
+          >
+            <span class="toolbar-italic">I</span>
+          </MiniButton>
+          <MiniButton
+            onclick={() => execEditorCommand("underline")}
+            aria-label="Underline"
+          >
+            <span class="toolbar-underline">U</span>
+          </MiniButton>
+          <MiniButton
+            onclick={() => execEditorCommand("justifyLeft")}
+            aria-label="Align left"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M2 3h12v1H2zm0 3h8v1H2zm0 3h12v1H2zm0 3h8v1H2z"
+                fill="currentColor"
+              ></path>
+            </svg>
+          </MiniButton>
+          <MiniButton
+            onclick={() => execEditorCommand("justifyCenter")}
+            aria-label="Align center"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M2 3h12v1H2zm2 3h8v1H4zm0 3h8v1H4zm2 3h4v1H6z"
+                fill="currentColor"
+              ></path>
+            </svg>
+          </MiniButton>
+          <MiniButton
+            onclick={() => execEditorCommand("justifyRight")}
+            aria-label="Align right"
+          >
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M2 3h12v1H2zm6 3h6v1H8zm0 3h6v1H8zm-4 3h10v1H4z"
+                fill="currentColor"
+              ></path>
+            </svg>
+          </MiniButton>
+          <MiniButton onclick={openLinkTools} aria-label="Insert link">
+            <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+              <path
+                d="M6.5 10.5 5 12a2.12 2.12 0 0 1-3 0 2.12 2.12 0 0 1 0-3l2.5-2.5a2.12 2.12 0 0 1 3 0l.5.5-.88.88-.5-.5a.88.88 0 0 0-1.24 0L2.88 9.88a.88.88 0 0 0 0 1.24.88.88 0 0 0 1.24 0l1.5-1.5zm3-5L11 4a2.12 2.12 0 0 1 3 0 2.12 2.12 0 0 1 0 3l-2.5 2.5a2.12 2.12 0 0 1-3 0l-.5-.5.88-.88.5.5a.88.88 0 0 0 1.24 0l2.5-2.5a.88.88 0 0 0 0-1.24.88.88 0 0 0-1.24 0l-1.5 1.5zM5.75 8.88l4-4 .88.88-4 4z"
+                fill="currentColor"
+              ></path>
+            </svg>
+          </MiniButton>
+          <Button onclick={() => (showTableTools = !showTableTools)}
+            >Table</Button
+          >
 
-      <Inline wrap="wrap" align="center">
-        <Select value="" onchange={handleFontFamilyChange}>
-          <Option value="">Font</Option>
-          {#each FONT_OPTIONS as option}
-            <Option value={option.value}>
-              <div style={option.previewStyle}>{option.label}</div>
-            </Option>
-          {/each}
-        </Select>
+          <Select
+            value=""
+            onchange={handleFontFamilyChange}
+            --select-width="70px"
+          >
+            <Option value="">Font</Option>
+            {#each FONT_OPTIONS as option}
+              <Option value={option.value}>
+                <span style={option.previewStyle}>{option.label}</span>
+              </Option>
+            {/each}
+          </Select>
 
-        <Select value="" onchange={handleFontSizeChange}>
-          <Option value="">Size</Option>
-          {#each FONT_SIZE_OPTIONS as option}
-            <Option value={option.value}>
-              <div style={option.previewStyle}>{option.label}</div>
-            </Option>
-          {/each}
-        </Select>
+          <Select value="" onchange={handleFontSizeChange}>
+            <Option value="">Size</Option>
+            {#each FONT_SIZE_OPTIONS as option}
+              <Option value={option.value}>
+                <span style={option.previewStyle}>{option.label}</span>
+              </Option>
+            {/each}
+          </Select>
 
-        <Select value="" onchange={handleLineHeightChange}>
-          <Option value="">Line Height</Option>
-          {#each LINE_HEIGHT_OPTIONS as option}
-            <Option value={option.value}>
-              <div style={option.previewStyle}>{option.label}</div>
-            </Option>
-          {/each}
-        </Select>
-
-        <Select value="" onchange={handleFieldInsert}>
-          <Option value="">Insert merge field...</Option>
-          {#each headers as h}
-            <Option value={h}>{h}</Option>
-          {/each}
-        </Select>
-      </Inline>
+          <Select value="" onchange={handleLineHeightChange}>
+            <Option value="">Line Height</Option>
+            {#each LINE_HEIGHT_OPTIONS as option}
+              <Option value={option.value}>
+                <span style={option.previewStyle}>{option.label}</span>
+              </Option>
+            {/each}
+          </Select>
+        </Inline>
+      {:else}
+        <!--  Spacer -->
+        <span>&nbsp;</span>
+      {/if}
+      <Select value="" onchange={handleFieldInsert}>
+        <Option value="">Insert merge field...</Option>
+        {#each headers as h}
+          <Option value={h}>{h}</Option>
+        {/each}
+      </Select>
     </Bar>
 
     {#if showLinkTools}
@@ -778,7 +813,6 @@
           />
           <Button primary onclick={applyLink}>Apply Link</Button>
           <Button
-            secondary
             onclick={() => {
               showLinkTools = false;
               linkUrl = "";
@@ -896,9 +930,7 @@
 
           <Inline wrap="wrap">
             <Button primary onclick={insertTable}>Insert Table</Button>
-            <Button secondary onclick={() => (showTableTools = false)}
-              >Close</Button
-            >
+            <Button onclick={() => (showTableTools = false)}>Close</Button>
           </Inline>
         {/if}
 
@@ -993,6 +1025,23 @@
     font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
     font-size: 14px;
     line-height: 1.45;
+    --line-width: none;
+  }
+
+  .editor :global(p),
+  .editor :global(blockquote),
+  .editor :global(dl),
+  .editor :global(ul),
+  .editor :global(ol),
+  .editor :global(h1),
+  .editor :global(h2),
+  .editor :global(h3),
+  .editor :global(h4),
+  .editor :global(h5),
+  .editor :global(h6) {
+    max-width: none;
+    margin-left: 0;
+    margin-right: 0;
   }
 
   .source-view {

@@ -19,12 +19,21 @@ export const GoogleAppsScript = {
       });
     },
 
-     saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; }): Promise<import("../shared/mailMerge").MailMergeConfig> {
+     saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; }): Promise<import("../shared/mailMerge").MailMergeConfig> {
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler((result: import("../shared/mailMerge").MailMergeConfig) => resolve(result))
           .withFailureHandler((error: any) => reject(error))
           .saveMailMergeConfig(settings);
+      });
+    },
+
+     checkEmailReceipts(sheetName: string): Promise<import("../shared/mailMerge").CheckReceiptsResult> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").CheckReceiptsResult) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .checkEmailReceipts(sheetName);
       });
     },
 

@@ -33,6 +33,16 @@ export const FONT_OPTIONS = [
     previewStyle: "font-family: Georgia, serif;",
   },
   {
+    value: '"Times New Roman", Times, serif',
+    label: "Times New Roman",
+    previewStyle: 'font-family: "Times New Roman", Times, serif;',
+  },
+  {
+    value: '"Palatino Linotype", Palatino, "Book Antiqua", serif',
+    label: "Palatino",
+    previewStyle: 'font-family: "Palatino Linotype", Palatino, "Book Antiqua", serif;',
+  },
+  {
     value:
       '"Brush Script MT", "Segoe Script", "Snell Roundhand", "Comic Sans MS", cursive',
     label: "Cursive",

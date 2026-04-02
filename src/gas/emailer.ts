@@ -54,6 +54,15 @@ export function applyTemplate(
   return output;
 }
 
+export function embedTrackingPixel(htmlBody: string, pixelUrl: string): string {
+  const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none;border:0;width:1px;height:1px;" />`;
+  const closeBody = htmlBody.lastIndexOf("</body>");
+  if (closeBody !== -1) {
+    return htmlBody.slice(0, closeBody) + pixel + htmlBody.slice(closeBody);
+  }
+  return htmlBody + pixel;
+}
+
 export function sendEmailFromTemplate(
   emailTemplate: string,
   subjectTemplate: string,

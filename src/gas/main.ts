@@ -1,4 +1,4 @@
 /** @OnlyCurrentDoc */
 export { onInstall, onOpen } from "./addOn";
 export * from "./api";
-export { doGet, showDialog, showSidebar } from "./serve";
+export { doGet, showAbout, showDialog, showSidebar } from "./serve";

@@ -1,4 +1,4 @@
-import type { MailMergeConfig, SheetInfo } from "../../shared/mailMerge";
+import type { CheckReceiptsResult, MailMergeConfig, SheetInfo } from "../../shared/mailMerge";
 import {
   mockConfig,
   mockMergeResult,
@@ -31,6 +31,7 @@ export function saveMailMergeConfig(settings: {
   subject: string;
   useMergeIf: boolean;
   mergeFormula: string;
+  trackReceipt: boolean;
 }): MailMergeConfig {
   return {
     ...mockConfig,
@@ -62,4 +63,9 @@ export function runMailMerge(_sheetName: string) {
 
 export function openEditorDialog(): void {
   openMockDialog();
+}
+
+
+export function checkEmailReceipts(_sheetName?: string): CheckReceiptsResult {
+  return { checked: 3, received: 1, pending: 2 };
 }

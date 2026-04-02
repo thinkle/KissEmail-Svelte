@@ -1,4 +1,5 @@
 import type {
+  CheckReceiptsResult,
   MailMergeConfig,
   MailMergeResult,
   SendTestEmailResult,
@@ -6,6 +7,7 @@ import type {
   TestRow,
 } from "../shared/mailMerge";
 import {
+  checkReceipts,
   doMerge,
   getSheetInfo,
   getTestRows,
@@ -33,9 +35,14 @@ export function saveMailMergeConfig(
     subject: string;
     useMergeIf: boolean;
     mergeFormula: string;
+    trackReceipt: boolean;
   }
 ): MailMergeConfig {
   return saveConfig(settings);
+}
+
+export function checkEmailReceipts(sheetName?: string): CheckReceiptsResult {
+  return checkReceipts(sheetName);
 }
 
 export function saveMailMergeTemplate(template: string): SheetInfo {

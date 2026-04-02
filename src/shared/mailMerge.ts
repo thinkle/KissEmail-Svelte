@@ -10,6 +10,7 @@ export interface MailMergeConfig {
   template: string;
   useMergeIf: boolean;
   mergeFormula: string;
+  trackReceipt: boolean;
 }
 
 export interface SaveMailMergeConfigInput {
@@ -21,6 +22,19 @@ export interface SaveMailMergeConfigInput {
   subject: string;
   useMergeIf: boolean;
   mergeFormula: string;
+  trackReceipt: boolean;
+}
+
+export interface ReceiptStatus {
+  firstAccessed: string;
+  lastAccessed: string;
+  accessCount: number;
+}
+
+export interface CheckReceiptsResult {
+  checked: number;
+  received: number;
+  pending: number;
 }
 
 export interface SheetInfo {
