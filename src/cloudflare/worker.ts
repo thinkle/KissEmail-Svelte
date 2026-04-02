@@ -8,6 +8,9 @@ interface ReceiptRecord {
   accessCount: number;
 }
 
+type ReceiptStatusMap = Record<string, ReceiptRecord | null>;
+const STATUS_BATCH_LIMIT = 100;
+
 // 1x1 transparent GIF
 const TRANSPARENT_GIF = new Uint8Array([
   0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x01, 0x00, 0x01, 0x00, 0x80, 0x00,
@@ -22,7 +25,8 @@ const TTL_SECONDS = 90 * 24 * 60 * 60;
 function corsHeaders() {
   return {
     "Access-Control-Allow-Origin": "*",
-    "Access-Control-Allow-Methods": "GET, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type",
   };
 }
 
@@ -80,6 +84,57 @@ export default {
       );
 
       return new Response(JSON.stringify(record ?? null), {
+        headers: {
+          "Content-Type": "application/json",
+          ...corsHeaders(),
+        },
+      });
+    }
+
+    // POST /status — batch receipt status check
+    if (request.method === "POST" && path === "/status") {
+      let ids: string[] = [];
+
+      try {
+        const body = await request.json<unknown>();
+        if (Array.isArray(body)) {
+          ids = body.map(String);
+        } else if (
+          body &&
+          typeof body === "object" &&
+          "ids" in body &&
+          Array.isArray((body as { ids?: unknown[] }).ids)
+        ) {
+          ids = (body as { ids: unknown[] }).ids.map(String);
+        }
+      } catch {
+        return new Response(JSON.stringify({ error: "Invalid JSON body" }), {
+          status: 400,
+          headers: {
+            "Content-Type": "application/json",
+            ...corsHeaders(),
+          },
+        });
+      }
+
+      const validIds = ids
+        .map((id) => id.trim())
+        .filter((id) => /^[a-zA-Z0-9_-]+$/.test(id))
+        .slice(0, STATUS_BATCH_LIMIT);
+
+      const records = await Promise.all(
+        validIds.map(async (id) => [
+          id,
+          await env.RECEIPTS.get<ReceiptRecord>(`receipt:${id}`, "json"),
+        ] as const)
+      );
+
+      const result: ReceiptStatusMap = {};
+      for (const [id, record] of records) {
+        result[id] = record ?? null;
+      }
+
+      return new Response(JSON.stringify(result), {
         headers: {
           "Content-Type": "application/json",
           ...corsHeaders(),

@@ -9,6 +9,7 @@ export const MAIL_MERGE_RECEIPT_ID_COLUMN = "Receipt ID";
 
 export const STATUS_SENT = "Sent";
 export const STATUS_OPENED_PREFIX = "Opened";
+const RECEIPT_STATUS_BATCH_SIZE = 100;
 
 export type ReceiptDebugResult = {
   receiptId: string;
@@ -17,6 +18,14 @@ export type ReceiptDebugResult = {
   body: string;
   parsed: unknown;
 };
+
+type ReceiptRecord = {
+  firstAccessed: string;
+  lastAccessed: string;
+  accessCount: number;
+};
+
+type ReceiptStatusMap = Record<string, ReceiptRecord | null>;
 
 function isSentOrOpened(value: unknown): boolean {
   if (typeof value !== "string" || !value) return false;
@@ -166,6 +175,7 @@ export function checkEmailReceipts(
 
   const baseUrl = trackingUrl.replace(/\/$/, "");
   const allValues = dataRange.getValues();
+  const pendingRows: Array<{ rowIndex: number; receiptId: string }> = [];
   let checked = 0;
   let received = 0;
   let pending = 0;
@@ -183,24 +193,19 @@ export function checkEmailReceipts(
       continue;
     }
 
-    try {
-      const statusUrl = `${baseUrl}/status/${receiptId}`;
-      const response = UrlFetchApp.fetch(statusUrl, {
-        muteHttpExceptions: true,
-      });
-      const responseCode = response.getResponseCode();
-      const body = response.getContentText();
-      console.log(
-        JSON.stringify({
-          event: "checkEmailReceipts.fetch",
-          receiptId,
-          row: rowIndex + 1,
-          statusUrl,
-          responseCode,
-          body,
-        })
-      );
-      const cfStatus = JSON.parse(body);
+    pendingRows.push({ rowIndex, receiptId });
+  }
+
+  for (
+    let startIndex = 0;
+    startIndex < pendingRows.length;
+    startIndex += RECEIPT_STATUS_BATCH_SIZE
+  ) {
+    const batch = pendingRows.slice(startIndex, startIndex + RECEIPT_STATUS_BATCH_SIZE);
+    const statusMap = fetchReceiptStatusBatch(baseUrl, batch.map(({ receiptId }) => receiptId));
+
+    batch.forEach(({ rowIndex, receiptId }) => {
+      const cfStatus = statusMap[receiptId];
       if (cfStatus && cfStatus.firstAccessed) {
         const opened = `${STATUS_OPENED_PREFIX}: ${cfStatus.firstAccessed}`;
         if (statusCol !== -1) {
@@ -210,20 +215,41 @@ export function checkEmailReceipts(
       } else {
         pending += 1;
       }
-    } catch (error) {
-      console.log(
-        JSON.stringify({
-          event: "checkEmailReceipts.error",
-          receiptId,
-          row: rowIndex + 1,
-          error: error instanceof Error ? error.message : String(error),
-        })
-      );
-      pending += 1;
-    }
+    });
   }
 
   return { checked, received, pending };
+}
+
+function fetchReceiptStatusBatch(
+  baseUrl: string,
+  receiptIds: string[]
+): ReceiptStatusMap {
+  const url = `${baseUrl}/status`;
+  const response = UrlFetchApp.fetch(url, {
+    method: "post",
+    contentType: "application/json",
+    payload: JSON.stringify({ ids: receiptIds }),
+    muteHttpExceptions: true,
+  });
+  const responseCode = response.getResponseCode();
+  const body = response.getContentText();
+
+  console.log(
+    JSON.stringify({
+      event: "checkEmailReceipts.batchFetch",
+      receiptIds,
+      url,
+      responseCode,
+      body,
+    })
+  );
+
+  if (responseCode < 200 || responseCode >= 300) {
+    throw new Error(`Receipt status batch request failed (${responseCode}).`);
+  }
+
+  return JSON.parse(body) as ReceiptStatusMap;
 }
 
 export function debugReceiptStatus(
