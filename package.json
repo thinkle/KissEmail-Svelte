@@ -1,0 +1,47 @@
+{
+  "name": "kiss-mail-merge-svelte",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently \"npm run watch:all\" \"vite --open mock/mock.html\"",
+    "build-svelte": "vite build",
+    "build-gas": "vite build --config vite.config.gas.ts",
+    "build-manifest": "cp ./appsscript.json ./dist/appsscript.json",
+    "build": "npm-run-all build:all build-svelte build-gas build-manifest",
+    "upload": "npm run build && npx clasp push",
+    "preview": "vite preview",
+    "check": "svelte-check --tsconfig ./tsconfig.json",
+    "create-clasp-project": "node createClaspProject.js",
+    "push-to-clasp": "npm run build && npx clasp push",
+    "watch:all": "chokidar 'src/gas/api.ts' -c 'npm run build:all'",
+    "build:all": "npm-run-all build-types build-mocks build-gas-api",
+    "build-gas-api": "create-client-api src/gas/api.ts src/svelte/gasApi.ts",
+    "build-types": "add-google-run-types src/gas/api.ts src/svelte/types/google.script.run.d.ts",
+    "build-mocks": "add-google-run-mocks src/gas/api.ts src/svelte/mock/mockApi.ts"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@sveltejs/vite-plugin-svelte": "^5.0.3",
+    "@tsconfig/svelte": "^5.0.4",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^8.2.2",
+    "npm-run-all": "^4.1.5",
+    "svelte": "^5.45.0",
+    "svelte-check": "^4.3.1",
+    "ts-morph": "^20.0.0",
+    "tsc": "^2.0.4",
+    "tslib": "^2.6.0",
+    "typescript": "^5.2.2",
+    "vite": "^6.0.0",
+    "vite-plugin-singlefile": "^2.3.0"
+  },
+  "dependencies": {
+    "@types/google-apps-script": "^1.0.76",
+    "@types/google-apps-script-oauth2": "^38.0.2",
+    "@types/google.picker": "^0.0.41",
+    "contain-css-svelte": "^1.1.2",
+    "google-apps-script-run-ts-mocks": "^0.0.3",
+    "google-apps-script-svelte-components": "^0.0.3"
+  }
+}

@@ -1,0 +1,40 @@
+@import "contain-css-svelte/vars/defaults.css";
+@import "contain-css-svelte/themes/purple.css";
+
+:root {
+  font-size: 14px;
+  --card-width-small: calc(100% - 4px);
+  --card-margin: 2px;
+  --bar-border-bottom: none;
+  --bar-border-top: none;
+  --control-bg: var(--material-color-pink-800);
+  --control-fg: var(--material-color-pink-50);
+  --stack-line-width: 100%; /* Workaround bug */
+  --hover-color-mix: #cc2222;
+  --hover-base-color-percentage: 55%;
+  --button-padding: 8px 4px;
+  --select-padding: var(--button-padding);
+  --button-border-radius: 16px;
+}
+
+body {
+  margin: 0;
+  font-size: 14px;
+  --font-size: 14px;
+  --text-font-size: 14px;
+  --gap: 2px;
+  --padding: 2px;
+  --heading-font-size: 17px;
+  --tag-font-size: 10px;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
