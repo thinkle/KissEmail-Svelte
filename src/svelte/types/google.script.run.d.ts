@@ -8,6 +8,7 @@ declare namespace google.script {
   loadSheetInfo(): void;
   saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; }): void;
   checkEmailReceipts(sheetName: string): void;
+  debugReceiptTracking(receiptId: string): void;
   saveMailMergeTemplate(template: string): void;
   loadTestRows(): void;
   sendMailMergeTestEmail(rowNumber: number, testAddress: string): void;

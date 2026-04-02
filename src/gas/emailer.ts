@@ -55,7 +55,10 @@ export function applyTemplate(
 }
 
 export function embedTrackingPixel(htmlBody: string, pixelUrl: string): string {
-  const pixel = `<img src="${pixelUrl}" width="1" height="1" alt="" style="display:none;border:0;width:1px;height:1px;" />`;
+  const pixel =
+    `<img src="${pixelUrl}" width="1" height="1" alt="" ` +
+    `style="display:block !important;border:0 !important;width:1px !important;height:1px !important;` +
+    `margin:0 !important;padding:0 !important;opacity:0 !important;" />`;
   const closeBody = htmlBody.lastIndexOf("</body>");
   if (closeBody !== -1) {
     return htmlBody.slice(0, closeBody) + pixel + htmlBody.slice(closeBody);

@@ -69,3 +69,21 @@ export function openEditorDialog(): void {
 export function checkEmailReceipts(_sheetName?: string): CheckReceiptsResult {
   return { checked: 3, received: 1, pending: 2 };
 }
+
+export function debugReceiptTracking(receiptId: string): import("/Users/thinkle/BackedUpProjects/gas/KissEmail-Svelte/src/gas/mailMerge").ReceiptDebugResult {
+  return {
+    receiptId,
+    url: `https://kiss-email-receipts.tmhinkle.workers.dev/status/${receiptId}`,
+    statusCode: 200,
+    body: JSON.stringify({
+      firstAccessed: "2026-04-02T18:15:03.438Z",
+      lastAccessed: "2026-04-02T18:15:03.438Z",
+      accessCount: 1,
+    }),
+    parsed: {
+      firstAccessed: "2026-04-02T18:15:03.438Z",
+      lastAccessed: "2026-04-02T18:15:03.438Z",
+      accessCount: 1,
+    },
+  };
+}

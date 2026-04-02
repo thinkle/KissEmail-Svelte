@@ -9,7 +9,7 @@ import type {
 } from "../shared/mailMerge";
 import { ConfigurationSheet } from "./configurationSheet";
 import { applyTemplate, sendEmailFromTemplate } from "./emailer";
-import { checkEmailReceipts, doMailMerge } from "./mailMerge";
+import { checkEmailReceipts, debugReceiptStatus, doMailMerge } from "./mailMerge";
 import { Table } from "./tableReader";
 import { TRACKING_URL } from "./trackingConfig";
 import { cleanupObject } from "./utils";
@@ -274,4 +274,8 @@ export function checkReceipts(sheetName?: string): CheckReceiptsResult {
   }
 
   return checkEmailReceipts(sheet, TRACKING_URL);
+}
+
+export function debugReceipt(receiptId: string) {
+  return debugReceiptStatus(receiptId, TRACKING_URL);
 }

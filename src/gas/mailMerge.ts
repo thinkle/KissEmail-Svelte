@@ -10,6 +10,14 @@ export const MAIL_MERGE_RECEIPT_ID_COLUMN = "Receipt ID";
 export const STATUS_SENT = "Sent";
 export const STATUS_OPENED_PREFIX = "Opened";
 
+export type ReceiptDebugResult = {
+  receiptId: string;
+  url: string;
+  statusCode: number;
+  body: string;
+  parsed: unknown;
+};
+
 function isSentOrOpened(value: unknown): boolean {
   if (typeof value !== "string" || !value) return false;
   return value === STATUS_SENT || value.startsWith(STATUS_OPENED_PREFIX);
@@ -176,10 +184,23 @@ export function checkEmailReceipts(
     }
 
     try {
-      const response = UrlFetchApp.fetch(`${baseUrl}/status/${receiptId}`, {
+      const statusUrl = `${baseUrl}/status/${receiptId}`;
+      const response = UrlFetchApp.fetch(statusUrl, {
         muteHttpExceptions: true,
       });
-      const cfStatus = JSON.parse(response.getContentText());
+      const responseCode = response.getResponseCode();
+      const body = response.getContentText();
+      console.log(
+        JSON.stringify({
+          event: "checkEmailReceipts.fetch",
+          receiptId,
+          row: rowIndex + 1,
+          statusUrl,
+          responseCode,
+          body,
+        })
+      );
+      const cfStatus = JSON.parse(body);
       if (cfStatus && cfStatus.firstAccessed) {
         const opened = `${STATUS_OPENED_PREFIX}: ${cfStatus.firstAccessed}`;
         if (statusCol !== -1) {
@@ -189,10 +210,53 @@ export function checkEmailReceipts(
       } else {
         pending += 1;
       }
-    } catch {
+    } catch (error) {
+      console.log(
+        JSON.stringify({
+          event: "checkEmailReceipts.error",
+          receiptId,
+          row: rowIndex + 1,
+          error: error instanceof Error ? error.message : String(error),
+        })
+      );
       pending += 1;
     }
   }
 
   return { checked, received, pending };
+}
+
+export function debugReceiptStatus(
+  receiptId: string,
+  trackingUrl: string
+): ReceiptDebugResult {
+  const trimmedReceiptId = String(receiptId ?? "").trim();
+  if (!trimmedReceiptId) {
+    throw new Error("Missing receipt ID.");
+  }
+
+  const url = `${trackingUrl.replace(/\/$/, "")}/status/${trimmedReceiptId}`;
+  const response = UrlFetchApp.fetch(url, {
+    muteHttpExceptions: true,
+  });
+  const statusCode = response.getResponseCode();
+  const body = response.getContentText();
+
+  let parsed: unknown = null;
+  try {
+    parsed = JSON.parse(body);
+  } catch {
+    parsed = null;
+  }
+
+  const result: ReceiptDebugResult = {
+    receiptId: trimmedReceiptId,
+    url,
+    statusCode,
+    body,
+    parsed,
+  };
+
+  console.log(JSON.stringify({ event: "debugReceiptStatus", ...result }));
+  return result;
 }

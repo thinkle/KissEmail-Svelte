@@ -37,6 +37,15 @@ export const GoogleAppsScript = {
       });
     },
 
+     debugReceiptTracking(receiptId: string): Promise<import("../gas/mailMerge").ReceiptDebugResult> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../gas/mailMerge").ReceiptDebugResult) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .debugReceiptTracking(receiptId);
+      });
+    },
+
      saveMailMergeTemplate(template: string): Promise<import("../shared/mailMerge").SheetInfo> {
       return new Promise((resolve, reject) => {
         google.script.run

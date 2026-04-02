@@ -8,6 +8,7 @@ import type {
 } from "../shared/mailMerge";
 import {
   checkReceipts,
+  debugReceipt,
   doMerge,
   getSheetInfo,
   getTestRows,
@@ -43,6 +44,10 @@ export function saveMailMergeConfig(
 
 export function checkEmailReceipts(sheetName?: string): CheckReceiptsResult {
   return checkReceipts(sheetName);
+}
+
+export function debugReceiptTracking(receiptId: string) {
+  return debugReceipt(receiptId);
 }
 
 export function saveMailMergeTemplate(template: string): SheetInfo {
