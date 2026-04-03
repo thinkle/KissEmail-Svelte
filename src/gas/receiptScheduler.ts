@@ -32,7 +32,7 @@ function defaultRegistry(): AutoReceiptRegistry {
 
 function normalizeRegistry(registry: AutoReceiptRegistry): AutoReceiptRegistry {
   const sheets = registry.sheets.filter(
-    (sheet) => Number.isFinite(sheet.sheetId) && sheet.sheetId > 0,
+    (sheet) => Number.isFinite(sheet.sheetId) && sheet.sheetId >= 0,
   );
   const nextSheetCursor =
     sheets.length > 0
@@ -64,9 +64,16 @@ function readRegistry(): AutoReceiptRegistry {
 }
 
 function writeRegistry(registry: AutoReceiptRegistry) {
+  const normalized = normalizeRegistry(registry);
   getDocumentProperties().setProperty(
     REGISTRY_KEY,
-    JSON.stringify(normalizeRegistry(registry)),
+    JSON.stringify(normalized),
+  );
+  console.log(
+    JSON.stringify({
+      event: "receiptScheduler.writeRegistry",
+      registry: normalized,
+    }),
   );
 }
 
@@ -78,16 +85,42 @@ function getReceiptTriggers() {
 
 function syncReceiptTrigger(registry: AutoReceiptRegistry) {
   const triggers = getReceiptTriggers();
+  console.log(
+    JSON.stringify({
+      event: "receiptScheduler.syncTrigger.begin",
+      sheetCount: registry.sheets.length,
+      triggerCount: triggers.length,
+    }),
+  );
   if (registry.sheets.length > 0) {
     if (!triggers.length) {
       ScriptApp.newTrigger(RECEIPT_TRIGGER_HANDLER).timeBased().everyHours(1).create();
+      console.log(
+        JSON.stringify({
+          event: "receiptScheduler.syncTrigger.created",
+          handler: RECEIPT_TRIGGER_HANDLER,
+        }),
+      );
       return;
     }
     triggers.slice(1).forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+    console.log(
+      JSON.stringify({
+        event: "receiptScheduler.syncTrigger.reused",
+        handler: RECEIPT_TRIGGER_HANDLER,
+        triggerCount: 1,
+      }),
+    );
     return;
   }
 
   triggers.forEach((trigger) => ScriptApp.deleteTrigger(trigger));
+  console.log(
+    JSON.stringify({
+      event: "receiptScheduler.syncTrigger.cleared",
+      handler: RECEIPT_TRIGGER_HANDLER,
+    }),
+  );
 }
 
 function upsertSheetState(
@@ -142,10 +175,12 @@ function getSpreadsheetForRegistry(
   if (active && (!registry.spreadsheetId || active.getId() === registry.spreadsheetId)) {
     return active;
   }
-  if (!registry.spreadsheetId) {
-    throw new Error("Receipt registry is missing spreadsheet ID.");
-  }
-  return SpreadsheetApp.openById(registry.spreadsheetId);
+
+  throw new Error(
+    active
+      ? `Active spreadsheet ${active.getId()} does not match receipt registry ${registry.spreadsheetId || "(none)"}.`
+      : "No active spreadsheet is available for scheduled receipt checks.",
+  );
 }
 
 export function syncAutoReceiptMonitoring(
@@ -153,6 +188,16 @@ export function syncAutoReceiptMonitoring(
   config: MailMergeConfig,
 ) {
   const registry = readRegistry();
+  console.log(
+    JSON.stringify({
+      event: "receiptScheduler.syncAutoReceiptMonitoring.begin",
+      sheetName: sheet.getName(),
+      sheetId: sheet.getSheetId(),
+      spreadsheetId: sheet.getParent().getId(),
+      config,
+      registryBefore: registry,
+    }),
+  );
   registry.spreadsheetId = sheet.getParent().getId();
 
   if (config.trackReceipt && config.autoCheckReceipts) {
@@ -163,6 +208,14 @@ export function syncAutoReceiptMonitoring(
 
   writeRegistry(registry);
   syncReceiptTrigger(registry);
+  console.log(
+    JSON.stringify({
+      event: "receiptScheduler.syncAutoReceiptMonitoring.end",
+      sheetName: sheet.getName(),
+      sheetId: sheet.getSheetId(),
+      registryAfter: registry,
+    }),
+  );
 }
 
 export function runScheduledReceiptChecks(): void {
@@ -249,13 +302,12 @@ export function runScheduledReceiptChecks(): void {
 
 export function getAutoReceiptStatus(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  config: MailMergeConfig,
 ): AutoReceiptStatus {
   const registry = readRegistry();
   const entry = registry.sheets.find((item) => item.sheetId === sheet.getSheetId());
 
   return {
-    enabled: Boolean(config.trackReceipt && config.autoCheckReceipts && entry),
+    enabled: Boolean(entry),
     lastCheckedAt: entry?.lastCheckedAt,
     lastCheckedPending: entry?.lastCheckedPending,
     lastError: entry?.lastError,

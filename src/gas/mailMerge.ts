@@ -230,13 +230,19 @@ export function summarizeReceiptTracking(
   sheet: GoogleAppsScript.Spreadsheet.Sheet
 ): ReceiptSummary {
   const dataRange = sheet.getDataRange();
-  const allValues = dataRange.getValues();
+  const totalRows = dataRange.getNumRows();
+  const totalColumns = dataRange.getNumColumns();
+  const rowOffset = dataRange.getRow();
+  const columnOffset = dataRange.getColumn();
 
-  if (allValues.length === 0) {
+  if (totalRows <= 0 || totalColumns <= 0) {
     return { tracked: 0, opened: 0, pending: 0 };
   }
 
-  const headers = allValues[0].map(String);
+  const headers = sheet
+    .getRange(rowOffset, columnOffset, 1, totalColumns)
+    .getValues()[0]
+    .map(String);
   const receiptIdCol = headers.indexOf(MAIL_MERGE_RECEIPT_ID_COLUMN);
   const statusCol = headers.indexOf(MAIL_MERGE_STATUS_COLUMN);
 
@@ -244,17 +250,31 @@ export function summarizeReceiptTracking(
     return { tracked: 0, opened: 0, pending: 0 };
   }
 
+  if (totalRows === 1) {
+    return { tracked: 0, opened: 0, pending: 0 };
+  }
+
+  const firstColumnIndex = Math.min(receiptIdCol, statusCol === -1 ? receiptIdCol : statusCol);
+  const lastColumnIndex = Math.max(receiptIdCol, statusCol);
+  const valueWidth = lastColumnIndex - firstColumnIndex + 1;
+  const rowValues = sheet
+    .getRange(rowOffset + 1, columnOffset + firstColumnIndex, totalRows - 1, valueWidth)
+    .getValues();
+  const receiptOffset = receiptIdCol - firstColumnIndex;
+  const statusOffset = statusCol === -1 ? -1 : statusCol - firstColumnIndex;
+
   let tracked = 0;
   let opened = 0;
 
-  for (let rowIndex = 1; rowIndex < allValues.length; rowIndex += 1) {
-    const receiptId = String(allValues[rowIndex][receiptIdCol] ?? "").trim();
+  for (let rowIndex = 0; rowIndex < rowValues.length; rowIndex += 1) {
+    const receiptId = String(rowValues[rowIndex][receiptOffset] ?? "").trim();
     if (!receiptId) {
       continue;
     }
 
     tracked += 1;
-    const status = statusCol === -1 ? "" : String(allValues[rowIndex][statusCol] ?? "");
+    const status =
+      statusOffset === -1 ? "" : String(rowValues[rowIndex][statusOffset] ?? "");
     if (status.startsWith(STATUS_OPENED_PREFIX)) {
       opened += 1;
     }

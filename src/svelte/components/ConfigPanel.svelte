@@ -3,8 +3,6 @@
     Accordion,
     Button,
     Checkbox,
-    Column,
-    Columns,
     Fieldset,
     Form,
     FormItem,
@@ -131,7 +129,6 @@
       <Stack>
       <Inline gap="0.75rem" wrap="wrap" align="center">
         {email || "loading account..."}
-        <Button onclick={onToggleEdit}>View Summary</Button>
       </Inline>
 
       <Form onsubmit={(event) => event.preventDefault()}>
@@ -224,63 +221,55 @@
 
           {#if useMergeIf}
             {#if !mergeCondition.doCustomFormula}
-              <Columns>
-                <Column>
-                  <FormItem fullWidth>
-                    {#snippet label()}Column{/snippet}
-                    <Select
-                      value={mergeCondition.selectedHeader}
-                      onchange={(event) =>
-                        updateMergeCondition({
-                          selectedHeader: (
-                            event.currentTarget as HTMLSelectElement
-                          ).value,
-                        })}
-                    >
-                      {#each headers as h}
-                        <Option value={h}>{h}</Option>
-                      {/each}
-                    </Select>
-                  </FormItem>
-                </Column>
+              <FormItem fullWidth>
+                {#snippet label()}Column{/snippet}
+                <Select
+                  value={mergeCondition.selectedHeader}
+                  onchange={(event) =>
+                    updateMergeCondition({
+                      selectedHeader: (
+                        event.currentTarget as HTMLSelectElement
+                      ).value,
+                    })}
+                >
+                  {#each headers as h}
+                    <Option value={h}>{h}</Option>
+                  {/each}
+                </Select>
+              </FormItem>
 
-                <Column>
-                  <FormItem fullWidth>
-                    {#snippet label()}Condition{/snippet}
-                    <Select
-                      value={mergeCondition.selectedCondition}
-                      onchange={(event) =>
-                        updateMergeCondition({
-                          selectedCondition: (
-                            event.currentTarget as HTMLSelectElement
-                          ).value,
-                        })}
-                    >
-                      {#each specialConditions as s}
-                        <Option value={s.formula}>{s.label}</Option>
-                      {/each}
-                    </Select>
-                  </FormItem>
-                </Column>
+              <FormItem fullWidth>
+                {#snippet label()}Condition{/snippet}
+                <Select
+                  value={mergeCondition.selectedCondition}
+                  onchange={(event) =>
+                    updateMergeCondition({
+                      selectedCondition: (
+                        event.currentTarget as HTMLSelectElement
+                      ).value,
+                    })}
+                >
+                  {#each specialConditions as s}
+                    <Option value={s.formula}>{s.label}</Option>
+                  {/each}
+                </Select>
+              </FormItem>
 
-                {#if needsValue(mergeCondition.selectedCondition)}
-                  <Column>
-                    <FormItem fullWidth>
-                      {#snippet label()}Value{/snippet}
-                      <Input
-                        type="text"
-                        value={mergeCondition.specialConditionText}
-                        oninput={(event) =>
-                          updateMergeCondition({
-                            specialConditionText: (
-                              event.currentTarget as HTMLInputElement
-                            ).value,
-                          })}
-                      />
-                    </FormItem>
-                  </Column>
-                {/if}
-              </Columns>
+              {#if needsValue(mergeCondition.selectedCondition)}
+                <FormItem fullWidth>
+                  {#snippet label()}Value{/snippet}
+                  <Input
+                    type="text"
+                    value={mergeCondition.specialConditionText}
+                    oninput={(event) =>
+                      updateMergeCondition({
+                        specialConditionText: (
+                          event.currentTarget as HTMLInputElement
+                        ).value,
+                      })}
+                  />
+                </FormItem>
+              {/if}
             {:else}
               <FormItem fullWidth>
                 {#snippet label()}Custom Formula{/snippet}
@@ -348,7 +337,6 @@
 
       <Inline gap="0.75rem" wrap="wrap">
         <Button primary onclick={onSaveConfig}>Save Configuration</Button>
-        <Button onclick={onToggleEdit}>View Summary</Button>
       </Inline>
       </Stack>
     {:else}

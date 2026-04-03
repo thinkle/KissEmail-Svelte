@@ -13,7 +13,7 @@
 </script>
 
 {#if view === "editor"}
-  <TemplateEditorDialog />
+  <TemplateEditorDialog initialSheetConfig={appContext.initialSheetConfig} />
 {:else}
-  <AppSidebar />
+  <AppSidebar initialSheetConfig={appContext.initialSheetConfig} />
 {/if}

@@ -10,6 +10,8 @@ import type {
 } from "../../shared/mailMerge";
 
 export type MockScenarioId =
+  | "data-only"
+  | "blank"
   | "draft"
   | "manual"
   | "hourly"
@@ -64,25 +66,42 @@ function sampleRows(): SheetInfo["sampleRows"] {
   ];
 }
 
-function testRows(): TestRow[] {
-  return [
-    { row: 2, to: "ava.ng@example.com" },
-    { row: 3, to: "sam.cho@example.com" },
-    { row: 4, to: "mika.lee@example.com" },
-  ];
+function buildTestRows(
+  headers: string[],
+  rows: SheetInfo["sampleRows"],
+): TestRow[] {
+  const emailIndex = headers.indexOf("Email");
+  if (emailIndex === -1) {
+    return [];
+  }
+
+  return rows
+    .map((row, index) => ({
+      row: index + 2,
+      to: String(row[emailIndex] ?? "").trim(),
+    }))
+    .filter((row) => row.to);
 }
 
 function makeSheetInfo(
   config: MailMergeConfig,
   receiptSummary: ReceiptSummary,
   autoReceiptStatus: AutoReceiptStatus,
+  options: {
+    headers?: string[];
+    sampleRows?: SheetInfo["sampleRows"];
+    sheet?: string;
+    quota?: number;
+  } = {},
 ): SheetInfo {
+  const headers = options.headers ?? ["Email", "FirstName", "LastName", "Grade"];
+  const rows = options.sampleRows ?? sampleRows();
   return {
-    headers: ["Email", "FirstName", "LastName", "Grade"],
+    headers,
     config,
-    sampleRows: sampleRows(),
-    quota: 1500,
-    sheet: "Contacts",
+    sampleRows: rows,
+    quota: options.quota ?? 1500,
+    sheet: options.sheet ?? "Contacts",
     autoReceiptStatus,
     receiptSummary,
   };
@@ -94,16 +113,26 @@ function makeState(options: {
   autoReceiptStatus?: AutoReceiptStatus;
   checkReceiptsResult?: CheckReceiptsResult;
   mergeResult?: MailMergeResult;
+  headers?: string[];
+  sampleRows?: SheetInfo["sampleRows"];
+  sheet?: string;
+  quota?: number;
 }): MockScenarioState {
   const config = baseConfig(options.config);
   const autoReceiptStatus = options.autoReceiptStatus ?? {
     enabled: Boolean(config.trackReceipt && config.autoCheckReceipts),
   };
+  const sheetInfo = makeSheetInfo(config, options.receiptSummary, autoReceiptStatus, {
+    headers: options.headers,
+    sampleRows: options.sampleRows,
+    sheet: options.sheet,
+    quota: options.quota,
+  });
 
   return {
     activeUserEmail: "thinkle@example.com",
-    sheetInfo: makeSheetInfo(config, options.receiptSummary, autoReceiptStatus),
-    testRows: testRows(),
+    sheetInfo,
+    testRows: buildTestRows(sheetInfo.headers, sheetInfo.sampleRows),
     checkReceiptsResult:
       options.checkReceiptsResult ??
       ({
@@ -116,6 +145,43 @@ function makeState(options: {
 }
 
 export const MOCK_SCENARIOS: MockScenarioDefinition[] = [
+  {
+    id: "data-only",
+    label: "Data Only / No Config",
+    description: "A sheet with columns and rows, but no saved mail-merge settings yet.",
+    createState: () =>
+      makeState({
+        config: {
+          jobName: "Contacts Mail Merge",
+          to: "",
+          subject: "",
+          template: "",
+          trackReceipt: false,
+          autoCheckReceipts: false,
+        },
+        receiptSummary: { tracked: 0, opened: 0, pending: 0 },
+      }),
+  },
+  {
+    id: "blank",
+    label: "Blank Sheet",
+    description: "An empty sheet with no headers, rows, or saved mail-merge settings yet.",
+    createState: () =>
+      makeState({
+        config: {
+          jobName: "Sheet1 Mail Merge",
+          to: "",
+          subject: "",
+          template: "",
+          trackReceipt: false,
+          autoCheckReceipts: false,
+        },
+        headers: [],
+        sampleRows: [],
+        sheet: "Sheet1",
+        receiptSummary: { tracked: 0, opened: 0, pending: 0 },
+      }),
+  },
   {
     id: "draft",
     label: "Draft / No Sends Yet",

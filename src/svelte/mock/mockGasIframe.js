@@ -33,6 +33,7 @@ export function setContext(context = {}) {
 const iframe = document.querySelector("iframe");
 const scenarioSelect = document.querySelector("#scenario");
 const scenarioDescription = document.querySelector("#scenario-description");
+const closeButton = document.querySelector(".close");
 
 function updateScenarioMeta(scenarioId = getMockScenarioId()) {
   const scenario = getMockScenarioDefinition(scenarioId);
@@ -102,5 +103,13 @@ if (sideButton) {
 if (dialogButton) {
   dialogButton.addEventListener("click", () => {
     setView("editor", getMockScenarioId());
+  });
+}
+
+if (closeButton) {
+  closeButton.addEventListener("click", () => {
+    if (DEFAULT_CONTEXT.view === "editor") {
+      setView("sidebar", getMockScenarioId());
+    }
   });
 }

@@ -21,40 +21,6 @@ const COLORS = {
   },
 } as const;
 
-function formatKeys(sheet: GoogleAppsScript.Spreadsheet.Sheet, rowNumber: number) {
-  const keyColors = rowNumber % 2 ? COLORS.key.even : COLORS.key.odd;
-  const valueColors = rowNumber % 2 ? COLORS.val.even : COLORS.val.odd;
-  const keyCell = sheet.getRange(rowNumber, 1, 1, 1);
-  keyCell.setFontColor(keyColors.fg);
-  keyCell.setBackground(keyColors.bg);
-  keyCell.setFontWeight("bold");
-  keyCell.setFontStyle("normal");
-  const valueCell = sheet.getRange(rowNumber, 2, 1, 1);
-  valueCell.setFontColor(valueColors.fg);
-  valueCell.setBackground(valueColors.bg);
-  valueCell.setFontWeight("normal");
-  valueCell.setFontStyle("italic");
-}
-
-function formatListKeys(sheet: GoogleAppsScript.Spreadsheet.Sheet, columnNumber: number) {
-  const keyColors = columnNumber % 2 ? COLORS.lkey.even : COLORS.lkey.odd;
-  const valueColors = columnNumber % 2 ? COLORS.lval.even : COLORS.lval.odd;
-  const keyCell = sheet.getRange(1, columnNumber, 1, 1);
-  keyCell.setFontColor(keyColors.fg);
-  keyCell.setBackground(keyColors.bg);
-  keyCell.setFontWeight("bold");
-  keyCell.setFontStyle("normal");
-
-  const rows = sheet.getLastRow();
-  if (rows > 1) {
-    const valueRange = sheet.getRange(2, columnNumber, rows - 1, 1);
-    valueRange.setFontColor(valueColors.fg);
-    valueRange.setBackground(valueColors.bg);
-    valueRange.setFontWeight("normal");
-    valueRange.setFontStyle("italic");
-  }
-}
-
 function LookupArray(keys: unknown[], values: unknown[]) {
   const lookup: Record<string, unknown> = {};
   keys.forEach((key) => {
@@ -94,28 +60,111 @@ export type ConfigurationSheetHandle = {
 export function ConfigurationSheet(
   sheet: GoogleAppsScript.Spreadsheet.Sheet
 ): ConfigurationSheetHandle {
+  function singleColumn<T>(values: T[]): T[][] {
+    return values.map((value) => [value]);
+  }
+
   function overwriteConfiguration(
     keyValues: Record<string, unknown>,
     listValues: Record<string, unknown[]>
   ) {
+    const keyEntries = Object.entries(keyValues);
+    const listEntries = Object.entries(listValues);
+    const maxListLength = listEntries.reduce(
+      (max, [, values]) => Math.max(max, values.length),
+      0
+    );
+    const rowCount = Math.max(keyEntries.length, listEntries.length ? maxListLength + 1 : 0);
+    const columnCount = Math.max(2, listEntries.length + 2);
+
     sheet.clear();
-    for (const [key, value] of Object.entries(keyValues)) {
-      sheet.appendRow([key, value]);
-      formatKeys(sheet, sheet.getLastRow());
+
+    if (!rowCount) {
+      return;
     }
 
-    let column = 3;
-    for (const [key, values] of Object.entries(listValues)) {
-      sheet.getRange(1, column, 1, 1).setValue(key);
-      values.forEach((value, index) => {
-        sheet.getRange(index + 2, column, 1, 1).setValue(value);
+    const grid = Array.from({ length: rowCount }, () =>
+      Array.from({ length: columnCount }, () => "")
+    );
+
+    keyEntries.forEach(([key, value], index) => {
+      grid[index][0] = key;
+      grid[index][1] = value === undefined || value === null ? "" : value;
+    });
+
+    listEntries.forEach(([key, values], index) => {
+      const columnIndex = index + 2;
+      grid[0][columnIndex] = key;
+      values.forEach((value, rowIndex) => {
+        grid[rowIndex + 1][columnIndex] = value === undefined || value === null ? "" : value;
       });
-      formatListKeys(sheet, column);
-      column += 1;
+    });
+
+    const range = sheet.getRange(1, 1, rowCount, columnCount);
+    range.setValues(grid);
+
+    if (keyEntries.length > 0) {
+      const keyColorRows = keyEntries.map((_, index) =>
+        (index + 1) % 2 ? COLORS.key.even : COLORS.key.odd
+      );
+      const valueColorRows = keyEntries.map((_, index) =>
+        (index + 1) % 2 ? COLORS.val.even : COLORS.val.odd
+      );
+
+      sheet
+        .getRange(1, 1, keyEntries.length, 1)
+        .setFontColors(singleColumn(keyColorRows.map((colors) => colors.fg)))
+        .setBackgrounds(singleColumn(keyColorRows.map((colors) => colors.bg)))
+        .setFontWeights(singleColumn(keyEntries.map(() => "bold")))
+        .setFontStyles(singleColumn(keyEntries.map(() => "normal")));
+
+      sheet
+        .getRange(1, 2, keyEntries.length, 1)
+        .setFontColors(singleColumn(valueColorRows.map((colors) => colors.fg)))
+        .setBackgrounds(singleColumn(valueColorRows.map((colors) => colors.bg)))
+        .setFontWeights(singleColumn(keyEntries.map(() => "normal")))
+        .setFontStyles(singleColumn(keyEntries.map(() => "italic")));
     }
-    if (sheet.getLastRow() > 0 && sheet.getLastColumn() > 0) {
-      sheet.getDataRange().setWrap(true);
+
+    if (listEntries.length > 0) {
+      const listHeaderColors = listEntries.map((_, index) =>
+        (index + 3) % 2 ? COLORS.lkey.even : COLORS.lkey.odd
+      );
+      const listValueColors = listEntries.map((_, index) =>
+        (index + 3) % 2 ? COLORS.lval.even : COLORS.lval.odd
+      );
+
+      sheet
+        .getRange(1, 3, 1, listEntries.length)
+        .setFontColors([listHeaderColors.map((colors) => colors.fg)])
+        .setBackgrounds([listHeaderColors.map((colors) => colors.bg)])
+        .setFontWeights([listEntries.map(() => "bold")])
+        .setFontStyles([listEntries.map(() => "normal")]);
+
+      if (maxListLength > 0) {
+        const valueRows = Array.from({ length: maxListLength }, () =>
+          listValueColors.map((colors) => colors.fg)
+        );
+        const backgroundRows = Array.from({ length: maxListLength }, () =>
+          listValueColors.map((colors) => colors.bg)
+        );
+        const weightRows = Array.from({ length: maxListLength }, () =>
+          listEntries.map(() => "normal")
+        );
+        const styleRows = Array.from({ length: maxListLength }, () =>
+          listEntries.map(() => "italic")
+        );
+
+        sheet
+          .getRange(2, 3, maxListLength, listEntries.length)
+          .setFontColors(valueRows)
+          .setBackgrounds(backgroundRows)
+          .setFontWeights(weightRows)
+          .setFontStyles(styleRows);
+      }
     }
+
+    range.setWrap(true);
   }
 
   function overwriteConfigurationTable(table: ConfigTable) {
@@ -189,13 +238,35 @@ export function ConfigurationSheet(
       return sheet.getSheetId();
     },
     loadConfigurationTable() {
+      const startedAt = Date.now();
       this.table = getConfigurationTable();
+      console.log(
+        JSON.stringify({
+          event: "ConfigurationSheet.loadConfigurationTable",
+          sheetName: sheet.getName(),
+          sheetId: sheet.getSheetId(),
+          durationMs: Date.now() - startedAt,
+          keys: Object.keys(this.table).length,
+        }),
+      );
     },
     writeConfigurationTable(table?: ConfigTable) {
       if (table) {
         this.table = table;
       }
+      const startedAt = Date.now();
       overwriteConfigurationTable(this.table);
+      console.log(
+        JSON.stringify({
+          event: "ConfigurationSheet.writeConfigurationTable",
+          sheetName: sheet.getName(),
+          sheetId: sheet.getSheetId(),
+          durationMs: Date.now() - startedAt,
+          keys: Object.keys(this.table).length,
+          rows: sheet.getLastRow(),
+          columns: sheet.getLastColumn(),
+        }),
+      );
     },
   };
 }

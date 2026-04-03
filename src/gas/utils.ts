@@ -9,6 +9,35 @@ export function shortStringify(value: unknown): string {
   }
 }
 
+export function withTiming<T>(
+  event: string,
+  details: Record<string, unknown>,
+  fn: () => T
+): T {
+  const startedAt = Date.now();
+  try {
+    const result = fn();
+    console.log(
+      JSON.stringify({
+        event,
+        durationMs: Date.now() - startedAt,
+        ...details,
+      })
+    );
+    return result;
+  } catch (error) {
+    console.log(
+      JSON.stringify({
+        event: `${event}.error`,
+        durationMs: Date.now() - startedAt,
+        ...details,
+        error: error instanceof Error ? error.message : String(error),
+      })
+    );
+    throw error;
+  }
+}
+
 export function spreadsheetify(value: unknown): string | number | boolean {
   if (Array.isArray(value)) {
     return value.map((item) => spreadsheetify(item)).join(", ");

@@ -1,10 +1,9 @@
 import App from "./App.svelte";
-import * as mockApi from "./mock/mockApi";
-import { GoogleMock } from "google-apps-script-run-ts-mocks";
+import GoogleMock from "./mock/mockGoogle";
 import { mount } from "svelte";
 
 if (import.meta.env.DEV) {
-  globalThis.google = new GoogleMock(mockApi);
+  globalThis.google = GoogleMock;
 }
 
 const target = document.getElementById("app");

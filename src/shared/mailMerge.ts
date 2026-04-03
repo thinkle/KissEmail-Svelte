@@ -52,15 +52,33 @@ export interface ReceiptSummary {
   pending: number;
 }
 
-export interface SheetInfo {
-  headers: string[];
+export interface SheetConfigState {
   config: MailMergeConfig;
-  sampleRows: SerializableCellValue[][];
-  quota: number;
   sheet: string;
+}
+
+export interface SheetHeaders {
+  headers: string[];
+}
+
+export interface SheetShell extends SheetConfigState, SheetHeaders {}
+
+export interface SheetSampleRows {
+  sampleRows: SerializableCellValue[][];
+}
+
+export interface SheetRawRows {
+  rowNumbers: number[];
+  rows: SerializableCellValue[][];
+}
+
+export interface SidebarStatus {
+  quota: number;
   autoReceiptStatus?: AutoReceiptStatus;
   receiptSummary?: ReceiptSummary;
 }
+
+export interface SheetInfo extends SheetShell, SheetSampleRows, SidebarStatus {}
 
 export interface TestRow {
   row: number;

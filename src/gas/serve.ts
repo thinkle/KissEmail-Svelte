@@ -2,11 +2,16 @@ const IDX = "index.html";
 const APPNAME = "KISS Mail Merge";
 
 import { getAddOnEnvironment } from "./addOn";
+import { getSheetConfig } from "./kissMailMerge";
+
+function withAppContext(context: Record<string, unknown>) {
+  return JSON.stringify(context);
+}
 
 export function doGet(e) {
   const template = HtmlService.createTemplateFromFile(IDX);
   const view = e?.parameter?.view === "editor" ? "editor" : "sidebar";
-  template.appContext = JSON.stringify({
+  template.appContext = withAppContext({
     addOn: "Unknown",
     container: view === "editor" ? "dialog" : "sidebar",
     view,
@@ -17,10 +22,11 @@ export function doGet(e) {
 
 export function showSidebar() {
   const template = HtmlService.createTemplateFromFile(IDX);
-  template.appContext = JSON.stringify({
+  template.appContext = withAppContext({
     addOn: "Sheets",
     container: "sidebar",
     view: "sidebar",
+    initialSheetConfig: getSheetConfig(),
   });
   const html = template.evaluate().setTitle(APPNAME);
   SpreadsheetApp.getUi().showSidebar(html);
@@ -61,11 +67,12 @@ export function showAbout() {
 
 export function showDialog(title: string = APPNAME, modal = true) {
   const template = HtmlService.createTemplateFromFile(IDX);
-  template.appContext = JSON.stringify({
+  template.appContext = withAppContext({
     addOn: "Sheets",
     container: "dialog",
     mode: modal ? "modal" : "modeless",
     view: "editor",
+    initialSheetConfig: getSheetConfig(),
   });
   const html = template.evaluate().setWidth(960).setHeight(720);
   if (modal) {

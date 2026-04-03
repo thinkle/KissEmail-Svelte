@@ -1,11 +1,23 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { Card, Container, Page, Stack } from "contain-css-svelte";
-  import type { SheetInfo } from "../../shared/mailMerge";
+  import type {
+    SheetConfigState,
+    SheetHeaders,
+    SheetRawRows,
+    SheetSampleRows,
+    SheetShell,
+  } from "../../shared/mailMerge";
   import { GoogleAppsScript } from "../gasApi";
   import BusyOverlay from "./BusyOverlay.svelte";
   import TemplateEditor from "./TemplateEditor.svelte";
-  import { renderPreview } from "../lib/mailMerge";
+  import { getSampleRowsFromRaw, renderPreview } from "../lib/mailMerge";
+
+  let {
+    initialSheetConfig,
+  }: {
+    initialSheetConfig?: SheetConfigState;
+  } = $props();
 
   let ui = $state({
     busy: false,
@@ -16,9 +28,11 @@
 
   let editorState = $state({
     headers: [] as string[],
-    sampleRows: [] as SheetInfo["sampleRows"],
+    sampleRows: [] as SheetSampleRows["sampleRows"],
     templateHtml: "",
+    headerRows: 1,
   });
+  let rawRows = $state<SheetRawRows>({ rowNumbers: [], rows: [] });
 
   const previewHtml = $derived(
     renderPreview(
@@ -45,21 +59,56 @@
     return String(error);
   }
 
-  function hydrate(info: SheetInfo) {
-    editorState.headers = info.headers ?? [];
-    editorState.sampleRows = info.sampleRows ?? [];
+  function hydrateConfig(info: SheetConfigState) {
     editorState.templateHtml = info.config?.template ?? "";
+    editorState.headerRows = Math.max(Number(info.config?.headerRows) || 1, 1);
+    editorState.sampleRows = getSampleRowsFromRaw(rawRows, editorState.headerRows);
+  }
+
+  function hydrateHeaders(info: SheetHeaders) {
+    editorState.headers = info.headers ?? [];
+  }
+
+  function hydrateShell(info: SheetShell) {
+    hydrateConfig(info);
+    hydrateHeaders(info);
+  }
+
+  function hydrateRawRows(info: SheetRawRows) {
+    rawRows = info;
+    editorState.sampleRows = getSampleRowsFromRaw(rawRows, editorState.headerRows);
   }
 
   async function loadEditorState() {
     ui.loading = true;
     try {
-      const info = await GoogleAppsScript.loadSheetInfo();
-      hydrate(info);
+      const configPromise = initialSheetConfig
+        ? Promise.resolve(initialSheetConfig)
+        : GoogleAppsScript.loadSheetConfig();
+      const headersPromise = GoogleAppsScript.loadSheetHeaders();
+      const rawRowsPromise = GoogleAppsScript.loadRawRows(10);
+      const config = await configPromise;
+      hydrateConfig(config);
       ui.errorMessage = "";
+      ui.loading = false;
+
+      void headersPromise
+        .then((info) => {
+          hydrateHeaders(info);
+        })
+        .catch((error) => {
+          ui.errorMessage = formatError(error);
+        });
+
+      void rawRowsPromise
+        .then((info) => {
+          hydrateRawRows(info);
+        })
+        .catch((error) => {
+          ui.errorMessage = formatError(error);
+        });
     } catch (error) {
       ui.errorMessage = formatError(error);
-    } finally {
       ui.loading = false;
     }
   }
@@ -68,7 +117,8 @@
     setBusy("Saving template...");
     try {
       const info = await GoogleAppsScript.saveMailMergeTemplate(editorState.templateHtml);
-      hydrate(info);
+      hydrateShell(info);
+      editorState.sampleRows = info.sampleRows ?? editorState.sampleRows;
       ui.errorMessage = "";
       if (typeof google !== "undefined" && google.script?.host?.close) {
         google.script.host.close();

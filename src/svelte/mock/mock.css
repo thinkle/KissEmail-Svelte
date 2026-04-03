@@ -92,6 +92,9 @@ body {
   padding: 10px 0 10px 12px;
   position: relative;
 }
+.sidebar header .close {
+  display: none;
+}
 .sidebar iframe {
   height: calc(100vh - 40px);
 }

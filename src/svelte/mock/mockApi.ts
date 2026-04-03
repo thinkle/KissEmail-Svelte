@@ -1,4 +1,14 @@
-import type { CheckReceiptsResult, MailMergeConfig, SheetInfo } from "../../shared/mailMerge";
+import type {
+  CheckReceiptsResult,
+  MailMergeConfig,
+  SheetConfigState,
+  SheetHeaders,
+  SheetRawRows,
+  SheetInfo,
+  SheetSampleRows,
+  SheetShell,
+  SidebarStatus,
+} from "../../shared/mailMerge";
 import type { ReceiptDebugResult } from "../../gas/mailMerge";
 import {
   createMockScenarioState,
@@ -22,6 +32,53 @@ export function getActiveUserEmail(): string {
 
 export function loadSheetInfo(): SheetInfo {
   return structuredClone(state.sheetInfo);
+}
+
+export function loadSheetConfig(): SheetConfigState {
+  return structuredClone({
+    config: state.sheetInfo.config,
+    sheet: state.sheetInfo.sheet,
+  });
+}
+
+export function loadSheetHeaders(): SheetHeaders {
+  return structuredClone({
+    headers: state.sheetInfo.headers,
+  });
+}
+
+export function loadSheetShell(): SheetShell {
+  return structuredClone({
+    headers: state.sheetInfo.headers,
+    config: state.sheetInfo.config,
+    sheet: state.sheetInfo.sheet,
+  });
+}
+
+export function loadSheetSampleRows(): SheetSampleRows {
+  return structuredClone({
+    sampleRows: state.sheetInfo.sampleRows,
+  });
+}
+
+export function loadSidebarStatus(): SidebarStatus {
+  return structuredClone({
+    quota: state.sheetInfo.quota,
+    autoReceiptStatus: state.sheetInfo.autoReceiptStatus,
+    receiptSummary: state.sheetInfo.receiptSummary,
+  });
+}
+
+export function loadRawRows(limit = 60): SheetRawRows {
+  const headerRows = Math.max(Number(state.sheetInfo.config.headerRows) || 1, 1);
+  const extraHeaderRows = Array.from({ length: Math.max(headerRows - 1, 0) }, () =>
+    state.sheetInfo.headers.map(() => ""),
+  );
+  const rows = [...extraHeaderRows, ...state.sheetInfo.sampleRows].slice(0, limit);
+  return structuredClone({
+    rowNumbers: rows.map((_, index) => index + 2),
+    rows,
+  });
 }
 
 export function saveMailMergeConfig(settings: {
@@ -86,4 +143,12 @@ export function debugReceiptTracking(receiptId: string): ReceiptDebugResult {
       accessCount: 1,
     },
   };
+}
+
+export function enableHourlyReceiptChecks(_sheetName?: string): MailMergeConfig {
+  updateMockStateForSavedConfig(state, {
+    trackReceipt: true,
+    autoCheckReceipts: true,
+  });
+  return structuredClone(state.sheetInfo.config);
 }

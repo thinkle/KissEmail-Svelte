@@ -19,6 +19,60 @@ export const GoogleAppsScript = {
       });
     },
 
+     loadSheetConfig(): Promise<import("../shared/mailMerge").SheetConfigState> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").SheetConfigState) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadSheetConfig();
+      });
+    },
+
+     loadSheetHeaders(): Promise<import("../shared/mailMerge").SheetHeaders> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").SheetHeaders) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadSheetHeaders();
+      });
+    },
+
+     loadSheetShell(): Promise<import("../shared/mailMerge").SheetShell> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").SheetShell) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadSheetShell();
+      });
+    },
+
+     loadSheetSampleRows(): Promise<import("../shared/mailMerge").SheetSampleRows> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").SheetSampleRows) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadSheetSampleRows();
+      });
+    },
+
+     loadRawRows(limit: number): Promise<import("../shared/mailMerge").SheetRawRows> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").SheetRawRows) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadRawRows(limit);
+      });
+    },
+
+     loadSidebarStatus(): Promise<import("../shared/mailMerge").SidebarStatus> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").SidebarStatus) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadSidebarStatus();
+      });
+    },
+
      saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; autoCheckReceipts: boolean; }): Promise<import("../shared/mailMerge").MailMergeConfig> {
       return new Promise((resolve, reject) => {
         google.script.run
@@ -34,6 +88,15 @@ export const GoogleAppsScript = {
           .withSuccessHandler((result: import("../shared/mailMerge").CheckReceiptsResult) => resolve(result))
           .withFailureHandler((error: any) => reject(error))
           .checkEmailReceipts(sheetName);
+      });
+    },
+
+     enableHourlyReceiptChecks(sheetName: string): Promise<import("../shared/mailMerge").MailMergeConfig> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").MailMergeConfig) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .enableHourlyReceiptChecks(sheetName);
       });
     },
 

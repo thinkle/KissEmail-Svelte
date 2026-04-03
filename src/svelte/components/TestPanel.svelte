@@ -2,8 +2,6 @@
   import {
     Accordion,
     Button,
-    Column,
-    Columns,
     FormItem,
     Inline,
     Input,
@@ -39,27 +37,21 @@
     <summary>Send Test Email</summary>
 
     <Stack>
-      <Columns>
-        <Column>
-          <FormItem fullWidth>
-            {#snippet label()}Pick Row{/snippet}
-            <Select bind:value={testRow}>
-              {#each testRows as r}
-                <Option value={String(r.row)}>
-                  Row {r.row}{r.to ? ` - ${r.to}` : ""}
-                </Option>
-              {/each}
-            </Select>
-          </FormItem>
-        </Column>
+      <FormItem fullWidth>
+        {#snippet label()}Pick Row{/snippet}
+        <Select bind:value={testRow}>
+          {#each testRows as r}
+            <Option value={String(r.row)}>
+              Row {r.row}{r.to ? ` - ${r.to}` : ""}
+            </Option>
+          {/each}
+        </Select>
+      </FormItem>
 
-        <Column>
-          <FormItem fullWidth>
-            {#snippet label()}Send To{/snippet}
-            <Input type="email" bind:value={testAddress} />
-          </FormItem>
-        </Column>
-      </Columns>
+      <FormItem fullWidth>
+        {#snippet label()}Send To{/snippet}
+        <Input type="email" bind:value={testAddress} />
+      </FormItem>
 
       <p>Uses saved configuration and template. CC/BCC are ignored.</p>
 

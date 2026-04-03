@@ -1,6 +1,8 @@
 import type {
   MailMergeConfig,
   SerializableCellValue,
+  SheetRawRows,
+  TestRow,
 } from "../../shared/mailMerge";
 
 export type MergeCondition = {
@@ -122,6 +124,36 @@ export function renderPreview(
     const value = rowObject[key];
     return value === null || value === undefined ? match : String(value);
   });
+}
+
+export function getSampleRowsFromRaw(
+  rawRows: SheetRawRows,
+  headerRows: number,
+  count = 3
+): SerializableCellValue[][] {
+  const skipRows = Math.max(Number(headerRows) || 1, 1) - 1;
+  return rawRows.rows.slice(skipRows, skipRows + count);
+}
+
+export function getTestRowsFromRaw(
+  headers: string[],
+  rawRows: SheetRawRows,
+  headerRows: number,
+  toTemplate: string,
+  limit = 50
+): TestRow[] {
+  if (!toTemplate.trim()) {
+    return [];
+  }
+
+  const skipRows = Math.max(Number(headerRows) || 1, 1) - 1;
+  const rows = rawRows.rows.slice(skipRows, skipRows + limit);
+  const rowNumbers = rawRows.rowNumbers.slice(skipRows, skipRows + limit);
+
+  return rows.map((row, index) => ({
+    row: rowNumbers[index],
+    to: renderPreview(toTemplate, headers, row),
+  }));
 }
 
 export function configIsReady(config: MailMergeConfig): boolean {

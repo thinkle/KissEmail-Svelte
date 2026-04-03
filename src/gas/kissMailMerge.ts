@@ -2,7 +2,13 @@ import type {
   CheckReceiptsResult,
   MailMergeConfig,
   SendTestEmailResult,
+  SheetConfigState,
+  SheetHeaders,
+  SheetRawRows,
+  SheetSampleRows,
+  SheetShell,
   SheetInfo,
+  SidebarStatus,
   TestRow,
   SaveMailMergeConfigInput,
   MailMergeResult,
@@ -18,7 +24,7 @@ import {
 import { getAutoReceiptStatus, syncAutoReceiptMonitoring } from "./receiptScheduler";
 import { Table } from "./tableReader";
 import { TRACKING_URL } from "./trackingConfig";
-import { cleanupObject } from "./utils";
+import { cleanupObject, withTiming } from "./utils";
 
 const CONFIG_SHEET_SUFFIX = " Mail Merge Config";
 
@@ -76,6 +82,12 @@ function toMailMergeConfig(sheetName: string, rawConfig: Record<string, unknown>
 
 function getColumnHeaders(): string[] {
   const sheet = getDataSheet();
+  return getColumnHeadersForSheet(sheet);
+}
+
+function getColumnHeadersForSheet(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet
+): string[] {
   const dataRange = sheet.getDataRange();
   return sheet
     .getRange(dataRange.getRow(), dataRange.getColumn(), 1, dataRange.getNumColumns())
@@ -84,7 +96,15 @@ function getColumnHeaders(): string[] {
 }
 
 function getSampleRows(headerRows: number): unknown[][] {
-  const dataRange = getDataSheet().getDataRange();
+  const sheet = getDataSheet();
+  return getSampleRowsForSheet(sheet, headerRows);
+}
+
+function getSampleRowsForSheet(
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
+  headerRows: number
+): unknown[][] {
+  const dataRange = sheet.getDataRange();
   const startRow = dataRange.getRow() + headerRows;
   const availableRows = dataRange.getLastRow() - startRow + 1;
   if (availableRows <= 0) {
@@ -136,19 +156,90 @@ export function getMergeSettings() {
 }
 
 export function getSheetInfo(): SheetInfo {
-  const sheet = getDataSheet();
-  const configSheet = getMergeSettings();
-  const config = toMailMergeConfig(sheet.getName(), configSheet.table);
-  const info: SheetInfo = {
-    headers: getColumnHeaders(),
-    config,
-    sampleRows: cleanupObject(getSampleRows(config.headerRows)) as SheetInfo["sampleRows"],
-    quota: MailApp.getRemainingDailyQuota(),
-    sheet: sheet.getName(),
-    autoReceiptStatus: getAutoReceiptStatus(sheet, config),
-    receiptSummary: summarizeReceiptTracking(sheet),
-  };
-  return cleanupObject(info) as SheetInfo;
+  return withTiming("kissMailMerge.getSheetInfo", {}, () => {
+    const shell = getSheetShell();
+    const info: SheetInfo = {
+      ...shell,
+      ...getSheetSampleRows(),
+      ...getSidebarStatus(),
+    };
+    return cleanupObject(info) as SheetInfo;
+  });
+}
+
+export function getSheetConfig(): SheetConfigState {
+  return withTiming("kissMailMerge.getSheetConfig", {}, () => {
+    const sheet = getDataSheet();
+    const configSheet = setupMergeConfig(sheet);
+    return {
+      config: toMailMergeConfig(sheet.getName(), configSheet.table),
+      sheet: sheet.getName(),
+    };
+  });
+}
+
+export function getSheetHeaders(): SheetHeaders {
+  return withTiming("kissMailMerge.getSheetHeaders", {}, () => {
+    const sheet = getDataSheet();
+    return {
+      headers: getColumnHeadersForSheet(sheet),
+    };
+  });
+}
+
+export function getSheetShell(): SheetShell {
+  return withTiming("kissMailMerge.getSheetShell", {}, () => ({
+    ...getSheetConfig(),
+    ...getSheetHeaders(),
+  }));
+}
+
+export function getSheetSampleRows(): SheetSampleRows {
+  return withTiming("kissMailMerge.getSheetSampleRows", {}, () => {
+    const sheet = getDataSheet();
+    const config = getMergeSettings().table as MailMergeConfig;
+    return {
+      sampleRows: cleanupObject(
+        getSampleRowsForSheet(sheet, Math.max(Number(config.headerRows) || 1, 1))
+      ) as SheetSampleRows["sampleRows"],
+    };
+  });
+}
+
+export function getRawRows(limit = 60): SheetRawRows {
+  return withTiming("kissMailMerge.getRawRows", { limit }, () => {
+    const sheet = getDataSheet();
+    const dataRange = sheet.getDataRange();
+    const rowOffset = dataRange.getRow();
+    const totalRows = dataRange.getNumRows();
+    const columnOffset = dataRange.getColumn();
+    const totalColumns = dataRange.getNumColumns();
+
+    if (totalRows <= 1 || totalColumns <= 0) {
+      return { rowNumbers: [], rows: [] };
+    }
+
+    const rowCount = Math.min(totalRows - 1, limit);
+    const values = sheet
+      .getRange(rowOffset + 1, columnOffset, rowCount, totalColumns)
+      .getValues();
+
+    return cleanupObject({
+      rowNumbers: Array.from({ length: rowCount }, (_, index) => rowOffset + 1 + index),
+      rows: values,
+    }) as SheetRawRows;
+  });
+}
+
+export function getSidebarStatus(): SidebarStatus {
+  return withTiming("kissMailMerge.getSidebarStatus", {}, () => {
+    const sheet = getDataSheet();
+    return {
+      quota: MailApp.getRemainingDailyQuota(),
+      autoReceiptStatus: getAutoReceiptStatus(sheet),
+      receiptSummary: summarizeReceiptTracking(sheet),
+    };
+  });
 }
 
 export function saveConfig(settings: SaveMailMergeConfigInput): MailMergeConfig {
@@ -160,6 +251,65 @@ export function saveConfig(settings: SaveMailMergeConfigInput): MailMergeConfig 
   };
   configSheet.writeConfigurationTable();
   const nextConfig = toMailMergeConfig(sheet.getName(), configSheet.table);
+  syncAutoReceiptMonitoring(sheet, nextConfig);
+  return nextConfig;
+}
+
+export function enableAutoReceiptChecks(sheetName?: string): MailMergeConfig {
+  const startedAt = Date.now();
+  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = sheetName
+    ? spreadsheet.getSheetByName(sheetName)
+    : getDataSheet();
+
+  console.log(
+    JSON.stringify({
+      event: "enableAutoReceiptChecks.begin",
+      requestedSheetName: sheetName ?? null,
+      activeSpreadsheetId: spreadsheet?.getId?.() ?? null,
+      activeSpreadsheetName: spreadsheet?.getName?.() ?? null,
+      resolvedSheetName: sheet?.getName?.() ?? null,
+      resolvedSheetId: sheet?.getSheetId?.() ?? null,
+    }),
+  );
+
+  if (!sheet) {
+    throw new Error(`Unable to find sheet ${sheetName}`);
+  }
+
+  const configSheet = setupMergeConfig(sheet);
+  console.log(
+    JSON.stringify({
+      event: "enableAutoReceiptChecks.configLoaded",
+      dataSheetName: sheet.getName(),
+      dataSheetId: sheet.getSheetId(),
+      configSheetId: configSheet.getSheetId(),
+      configBefore: configSheet.table,
+    }),
+  );
+  const nextConfig = toMailMergeConfig(sheet.getName(), {
+    ...configSheet.table,
+    trackReceipt: true,
+    autoCheckReceipts: true,
+  });
+
+  configSheet.table = {
+    ...configSheet.table,
+    trackReceipt: nextConfig.trackReceipt,
+    autoCheckReceipts: nextConfig.autoCheckReceipts,
+  };
+  configSheet.writeConfigurationTable();
+
+  console.log(
+    JSON.stringify({
+      event: "enableAutoReceiptChecks.afterWrite",
+      sheetName: sheet.getName(),
+      sheetId: sheet.getSheetId(),
+      nextConfig,
+      durationMs: Date.now() - startedAt,
+    }),
+  );
+
   syncAutoReceiptMonitoring(sheet, nextConfig);
   return nextConfig;
 }
@@ -176,39 +326,41 @@ export function saveTemplate(template: string): SheetInfo {
 }
 
 export function getTestRows(limit = 50): TestRow[] {
-  const sheet = getDataSheet();
-  const config = getMergeSettings().table as MailMergeConfig;
-  const headerRows = Math.max(Number(config.headerRows) || 1, 1);
-  const dataRange = sheet.getDataRange();
-  const rowOffset = dataRange.getRow();
-  const totalRows = dataRange.getNumRows();
-  const maxRows = Math.min(totalRows, headerRows + limit);
+  return withTiming("kissMailMerge.getTestRows", { limit }, () => {
+    const sheet = getDataSheet();
+    const config = getMergeSettings().table as MailMergeConfig;
+    const headerRows = Math.max(Number(config.headerRows) || 1, 1);
+    const dataRange = sheet.getDataRange();
+    const rowOffset = dataRange.getRow();
+    const totalRows = dataRange.getNumRows();
+    const maxRows = Math.min(totalRows, headerRows + limit);
 
-  if (maxRows <= headerRows || !config.to) {
-    return [];
-  }
-
-  const range = sheet.getRange(
-    rowOffset,
-    dataRange.getColumn(),
-    maxRows,
-    dataRange.getNumColumns()
-  );
-  const table = Table(range);
-  const rows: TestRow[] = [];
-
-  for (let index = headerRows; index < table.length; index += 1) {
-    const rowNumber = rowOffset + index;
-    let toPreview = "";
-    try {
-      toPreview = applyTemplate(config.to, table[index]);
-    } catch {
-      toPreview = "";
+    if (maxRows <= headerRows || !config.to) {
+      return [];
     }
-    rows.push({ row: rowNumber, to: toPreview });
-  }
 
-  return cleanupObject(rows) as TestRow[];
+    const range = sheet.getRange(
+      rowOffset,
+      dataRange.getColumn(),
+      maxRows,
+      dataRange.getNumColumns()
+    );
+    const table = Table(range);
+    const rows: TestRow[] = [];
+
+    for (let index = headerRows; index < table.length; index += 1) {
+      const rowNumber = rowOffset + index;
+      let toPreview = "";
+      try {
+        toPreview = applyTemplate(config.to, table[index]);
+      } catch {
+        toPreview = "";
+      }
+      rows.push({ row: rowNumber, to: toPreview });
+    }
+
+    return cleanupObject(rows) as TestRow[];
+  });
 }
 
 export function sendTestEmail(rowNumber: number, testAddress: string): SendTestEmailResult {
