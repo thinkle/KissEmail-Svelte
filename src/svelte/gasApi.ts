@@ -73,7 +73,25 @@ export const GoogleAppsScript = {
       });
     },
 
-     saveMailMergeConfig(settings: { jobName: string; headerRows: number; to: string; cc: string; bcc: string; subject: string; useMergeIf: boolean; mergeFormula: string; trackReceipt: boolean; autoCheckReceipts: boolean; }): Promise<import("../shared/mailMerge").MailMergeConfig> {
+     loadRecentDrafts(limit: number): Promise<import("../shared/mailMerge").GmailDraftSummary[]> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").GmailDraftSummary[]) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadRecentDrafts(limit);
+      });
+    },
+
+     loadDraftTemplate(draftId: string): Promise<import("../shared/mailMerge").GmailDraftTemplate> {
+      return new Promise((resolve, reject) => {
+        google.script.run
+          .withSuccessHandler((result: import("../shared/mailMerge").GmailDraftTemplate) => resolve(result))
+          .withFailureHandler((error: any) => reject(error))
+          .loadDraftTemplate(draftId);
+      });
+    },
+
+     saveMailMergeConfig(settings: Partial<import("/Users/thinkle/BackedUpProjects/gas/KissEmail-Svelte/src/shared/mailMerge").SaveMailMergeConfigInput>): Promise<import("../shared/mailMerge").MailMergeConfig> {
       return new Promise((resolve, reject) => {
         google.script.run
           .withSuccessHandler((result: import("../shared/mailMerge").MailMergeConfig) => resolve(result))

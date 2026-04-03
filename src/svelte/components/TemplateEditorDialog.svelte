@@ -11,7 +11,11 @@
   import { GoogleAppsScript } from "../gasApi";
   import BusyOverlay from "./BusyOverlay.svelte";
   import TemplateEditor from "./TemplateEditor.svelte";
-  import { getSampleRowsFromRaw, renderPreview } from "../lib/mailMerge";
+  import {
+    getSampleRowsFromRaw,
+    getTemplateWarnings,
+    renderPreview,
+  } from "../lib/mailMerge";
 
   let {
     initialSheetConfig,
@@ -40,6 +44,9 @@
       editorState.headers,
       editorState.sampleRows[0] ?? [],
     ),
+  );
+  const warnings = $derived.by(() =>
+    getTemplateWarnings(editorState.templateHtml, editorState.headers),
   );
 
   function setBusy(message: string) {
@@ -155,6 +162,7 @@
         headers={editorState.headers}
         bind:templateHtml={editorState.templateHtml}
         {previewHtml}
+        {warnings}
         onSaveTemplate={saveTemplate}
       />
     {/if}

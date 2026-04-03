@@ -8,16 +8,21 @@
     Container,
     Inline,
     MiniButton,
+    Option,
+    Select,
     Stack,
     Tooltip,
     Tag,
-    TextLayout,
     Dialog,
+    TabBar,
+    TabItem,
   } from "contain-css-svelte";
   import type {
+    AppCapabilities,
     AutoReceiptStatus,
     MailMergeConfig,
     CheckReceiptsResult,
+    GmailDraftSummary,
     ReceiptSummary,
     SaveMailMergeConfigInput,
     SheetConfigState,
@@ -31,15 +36,18 @@
   import BusyOverlay from "./BusyOverlay.svelte";
   import AboutKiss from "./AboutKiss.svelte";
   import ConfigPanel from "./ConfigPanel.svelte";
+  import EmailFrame from "./EmailFrame.svelte";
   import FooterBar from "./FooterBar.svelte";
   import ReceiptPanel from "./ReceiptPanel.svelte";
   import TemplateEditor from "./TemplateEditor.svelte";
+  import TemplateWarnings from "./TemplateWarnings.svelte";
   import TestPanel from "./TestPanel.svelte";
   import {
     SPECIAL_CONDITIONS,
     buildMergeFormula,
     configIsReady,
     defaultMergeCondition,
+    getTemplateWarnings,
     getSampleRowsFromRaw,
     getTestRowsFromRaw,
     mergeConditionFromConfig,
@@ -65,6 +73,8 @@
     mergeFormula: "",
     trackReceipt: true,
     autoCheckReceipts: false,
+    contentSource: "template",
+    draftId: "",
   });
 
   let ui = $state({
@@ -106,6 +116,12 @@
   let receiptChecking = $state(false);
   let receiptAction = $state<"checking" | "enabling" | null>(null);
   let autoReceiptStatus = $state<AutoReceiptStatus>({ enabled: false });
+  let capabilities = $state<AppCapabilities>({
+    basicMailMerge: { available: true },
+    receiptChecks: { available: true },
+    receiptScheduling: { available: true },
+    gmailDrafts: { available: false },
+  });
   let receiptSummary = $state<ReceiptSummary>({
     tracked: 0,
     opened: 0,
@@ -123,6 +139,14 @@
   let templatePollAttempts = $state(0);
   let refreshToken = $state(0);
   let rawRows = $state<SheetRawRows>({ rowNumbers: [], rows: [] });
+  let draftState = $state({
+    drafts: [] as GmailDraftSummary[],
+    loadingList: false,
+    loadingTemplate: false,
+    templateHtml: "",
+    warnings: [] as string[],
+    error: "",
+  });
 
   const specialConditions = SPECIAL_CONDITIONS;
 
@@ -135,9 +159,24 @@
     ),
   });
 
+  const activeTemplateHtml = $derived(
+    config.contentSource === "draft"
+      ? draftState.templateHtml
+      : config.template,
+  );
+  const templateWarnings = $derived.by(() =>
+    getTemplateWarnings(config.template, sheetData.headers),
+  );
+  const draftWarnings = $derived.by(() =>
+    getTemplateWarnings(
+      draftState.templateHtml,
+      sheetData.headers,
+      draftState.warnings,
+    ),
+  );
   const previewHtml = $derived(
     renderPreview(
-      config.template,
+      activeTemplateHtml,
       sheetData.headers,
       sheetData.sampleRows[0] ?? [],
     ),
@@ -240,6 +279,7 @@
       opened: 0,
       pending: 0,
     };
+    capabilities = info.capabilities ?? capabilities;
   }
 
   async function loadSheetConfig(token = refreshToken) {
@@ -300,11 +340,98 @@
         return;
       }
       hydrateSidebarStatus(info);
+      if (capabilities.gmailDrafts.available) {
+        void loadRecentDrafts(token);
+        if (config.contentSource === "draft" && config.draftId) {
+          void loadDraftTemplate(config.draftId, token);
+        }
+      }
     } catch (error) {
       if (token === refreshToken) {
         ui.errorMessage = formatError(error);
       }
     }
+  }
+
+  async function loadRecentDrafts(token = refreshToken) {
+    draftState.loadingList = true;
+    try {
+      const drafts = await GoogleAppsScript.loadRecentDrafts(20);
+      if (token !== refreshToken) {
+        return;
+      }
+      draftState.drafts = drafts;
+      draftState.error = "";
+    } catch (error) {
+      if (token === refreshToken) {
+        draftState.error = formatError(error);
+      }
+    } finally {
+      if (token === refreshToken) {
+        draftState.loadingList = false;
+      }
+    }
+  }
+
+  async function loadDraftTemplate(draftId: string, token = refreshToken) {
+    if (!draftId) {
+      draftState.templateHtml = "";
+      draftState.warnings = [];
+      return;
+    }
+
+    draftState.loadingTemplate = true;
+    try {
+      const draft = await GoogleAppsScript.loadDraftTemplate(draftId);
+      if (token !== refreshToken) {
+        return;
+      }
+      draftState.templateHtml = draft.htmlBody ?? "";
+      draftState.warnings = draft.warnings ?? [];
+      draftState.error = "";
+    } catch (error) {
+      if (token === refreshToken) {
+        draftState.error = formatError(error);
+      }
+    } finally {
+      if (token === refreshToken) {
+        draftState.loadingTemplate = false;
+      }
+    }
+  }
+
+  async function persistContentSource() {
+    try {
+      await GoogleAppsScript.saveMailMergeConfig({
+        contentSource: config.contentSource,
+        draftId: config.draftId,
+      });
+      ui.errorMessage = "";
+    } catch (error) {
+      ui.errorMessage = formatError(error);
+    }
+  }
+
+  async function selectContentSource(source: "template" | "draft") {
+    if (source === "draft" && !capabilities.gmailDrafts.available) {
+      return;
+    }
+    config.contentSource = source;
+    if (source === "draft" && capabilities.gmailDrafts.available) {
+      if (!draftState.drafts.length) {
+        void loadRecentDrafts();
+      }
+      if (config.draftId) {
+        void loadDraftTemplate(config.draftId);
+      }
+    }
+    await persistContentSource();
+  }
+
+  async function selectDraft(draftId: string) {
+    config.draftId = draftId;
+    await persistContentSource();
+    await loadDraftTemplate(draftId);
   }
 
   function loadSidebarSupplements(token = refreshToken) {
@@ -364,6 +491,8 @@
       mergeFormula: computedConfig.mergeFormula,
       trackReceipt: config.trackReceipt,
       autoCheckReceipts: config.trackReceipt ? config.autoCheckReceipts : false,
+      contentSource: config.contentSource,
+      draftId: config.draftId,
     };
 
     setBusy("Saving configuration...");
@@ -649,6 +778,8 @@
         {specialConditions}
         bind:trackReceipt={config.trackReceipt}
         bind:autoCheckReceipts={config.autoCheckReceipts}
+        canCheckReceipts={capabilities.receiptChecks.available}
+        canScheduleReceipts={capabilities.receiptScheduling.available}
         onSaveConfig={saveConfig}
         onToggleEdit={() => (ui.editing = true)}
       />
@@ -656,13 +787,99 @@
       <Accordion>
         <details bind:open={templateOpen}>
           <summary>Email Template</summary>
-          <TemplateEditor
-            mode="sidebar"
-            headers={sheetData.headers}
-            bind:templateHtml={config.template}
-            {previewHtml}
-            onOpenEditor={openEditor}
-          />
+          <Stack>
+            <TabBar>
+              <TabItem
+                active={config.contentSource === "template"}
+                onclick={() => void selectContentSource("template")}
+              >
+                Template Editor
+              </TabItem>
+              <TabItem
+                active={config.contentSource === "draft"}
+                disabled={!capabilities.gmailDrafts.available}
+                onclick={() => void selectContentSource("draft")}
+              >
+                Use Gmail Draft
+              </TabItem>
+            </TabBar>
+
+            {#if !capabilities.gmailDrafts.available}
+              <Card bg="var(--warning-bg)" fg="var(--warning-fg)">
+                <p>
+                  Draft mode is not available without full Gmail permissions.
+                </p>
+                {#if capabilities.gmailDrafts.authUrl}
+                  <p>
+                    <a
+                      href={capabilities.gmailDrafts.authUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Open authorization page
+                    </a>
+                  </p>
+                {/if}
+              </Card>
+            {/if}
+
+            {#if config.contentSource === "template"}
+              <TemplateEditor
+                mode="sidebar"
+                headers={sheetData.headers}
+                bind:templateHtml={config.template}
+                {previewHtml}
+                warnings={templateWarnings}
+                onOpenEditor={openEditor}
+              />
+            {:else}
+              <Stack>
+                {#if capabilities.gmailDrafts.available}
+                  <Stack>
+                    <p>
+                      Use a Gmail draft as the body source for this mail merge.
+                    </p>
+                    <Select
+                      value={config.draftId}
+                      onchange={(event) =>
+                        void selectDraft(
+                          (event.currentTarget as HTMLSelectElement).value,
+                        )}
+                    >
+                      <Option value="">Select a draft...</Option>
+                      {#each draftState.drafts as draft}
+                        <Option value={draft.id}>
+                          {draft.subject}
+                          {draft.updatedAt
+                            ? `(${new Date(draft.updatedAt).toLocaleDateString()})`
+                            : ""}
+                        </Option>
+                      {/each}
+                    </Select>
+                    {#if draftState.loadingList}
+                      <p>Loading drafts...</p>
+                    {/if}
+                    {#if draftState.error}
+                      <p>{draftState.error}</p>
+                    {/if}
+                  </Stack>
+                  {#if config.draftId}
+                    <Stack>
+                      <TemplateWarnings
+                        warnings={draftWarnings}
+                        title="Draft warnings"
+                      />
+                      {#if draftState.loadingTemplate}
+                        <p>Loading draft preview...</p>
+                      {:else}
+                        <EmailFrame html={previewHtml} title="Draft preview" />
+                      {/if}
+                    </Stack>
+                  {/if}
+                {/if}
+              </Stack>
+            {/if}
+          </Stack>
         </details>
       </Accordion>
 

@@ -13,6 +13,7 @@
     Stack,
   } from "contain-css-svelte";
   import EmailFrame from "./EmailFrame.svelte";
+  import TemplateWarnings from "./TemplateWarnings.svelte";
   import {
     FONT_OPTIONS,
     FONT_SIZE_OPTIONS,
@@ -24,6 +25,7 @@
     headers = [],
     templateHtml = $bindable(""),
     previewHtml = "",
+    warnings = [],
     mode = "sidebar",
     onOpenEditor,
     onSaveTemplate,
@@ -31,6 +33,7 @@
     headers?: string[];
     templateHtml?: string;
     previewHtml?: string;
+    warnings?: string[];
     mode?: "sidebar" | "editor";
     onOpenEditor?: () => void;
     onSaveTemplate?: () => void;
@@ -983,7 +986,7 @@
       </Stack>
     </Fieldset>
   {/if}
-
+  <TemplateWarnings {warnings} />
   {#if showPreview}
     <div class="email-preview"><EmailFrame html={previewHtml} /></div>
   {:else if showSource}

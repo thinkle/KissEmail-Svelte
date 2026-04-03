@@ -54,6 +54,8 @@ function baseConfig(overrides: Partial<MailMergeConfig> = {}): MailMergeConfig {
     mergeFormula: "",
     trackReceipt: true,
     autoCheckReceipts: false,
+    contentSource: "template",
+    draftId: "",
     ...overrides,
   };
 }

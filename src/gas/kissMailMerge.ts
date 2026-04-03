@@ -1,5 +1,7 @@
 import type {
   CheckReceiptsResult,
+  GmailDraftSummary,
+  GmailDraftTemplate,
   MailMergeConfig,
   SendTestEmailResult,
   SheetConfigState,
@@ -13,6 +15,7 @@ import type {
   SaveMailMergeConfigInput,
   MailMergeResult,
 } from "../shared/mailMerge";
+import { getCapabilities } from "./capabilities";
 import { ConfigurationSheet } from "./configurationSheet";
 import { applyTemplate, sendEmailFromTemplate } from "./emailer";
 import {
@@ -56,6 +59,8 @@ function getDefaultConfig(sheetName: string): MailMergeConfig {
     mergeFormula: "",
     trackReceipt: true,
     autoCheckReceipts: false,
+    contentSource: "template",
+    draftId: "",
   };
 }
 
@@ -77,6 +82,8 @@ function toMailMergeConfig(sheetName: string, rawConfig: Record<string, unknown>
       typeof rawConfig.mergeFormula === "string" ? rawConfig.mergeFormula : defaults.mergeFormula,
     trackReceipt: Boolean(rawConfig.trackReceipt),
     autoCheckReceipts: Boolean(rawConfig.trackReceipt && rawConfig.autoCheckReceipts),
+    contentSource: rawConfig.contentSource === "draft" ? "draft" : "template",
+    draftId: typeof rawConfig.draftId === "string" ? rawConfig.draftId : defaults.draftId,
   };
 }
 
@@ -238,11 +245,12 @@ export function getSidebarStatus(): SidebarStatus {
       quota: MailApp.getRemainingDailyQuota(),
       autoReceiptStatus: getAutoReceiptStatus(sheet),
       receiptSummary: summarizeReceiptTracking(sheet),
+      capabilities: getCapabilities(),
     };
   });
 }
 
-export function saveConfig(settings: SaveMailMergeConfigInput): MailMergeConfig {
+export function saveConfig(settings: Partial<SaveMailMergeConfigInput>): MailMergeConfig {
   const configSheet = getMergeSettings();
   const sheet = getDataSheet();
   configSheet.table = {
@@ -253,6 +261,62 @@ export function saveConfig(settings: SaveMailMergeConfigInput): MailMergeConfig 
   const nextConfig = toMailMergeConfig(sheet.getName(), configSheet.table);
   syncAutoReceiptMonitoring(sheet, nextConfig);
   return nextConfig;
+}
+
+export function listRecentDrafts(limit = 20): GmailDraftSummary[] {
+  return withTiming("kissMailMerge.listRecentDrafts", { limit }, () => {
+    const drafts = GmailApp.getDrafts().slice(0, limit);
+    return cleanupObject(
+      drafts.map((draft) => {
+        const message = draft.getMessage();
+        return {
+          id: draft.getId(),
+          subject: message.getSubject() || "(No subject)",
+          to: message.getTo() || "",
+          updatedAt: message.getDate().toISOString(),
+        };
+      }),
+    ) as GmailDraftSummary[];
+  });
+}
+
+function getDraftWarnings(htmlBody: string): string[] {
+  const warnings: string[] = [];
+  if (/src\s*=\s*["']cid:/i.test(htmlBody)) {
+    warnings.push("This draft contains embedded images and may not round-trip cleanly.");
+  }
+  if (/src\s*=\s*["']data:image\//i.test(htmlBody)) {
+    warnings.push("This draft includes data-URI images, which can be large and fragile in sheet-stored HTML.");
+  }
+  return warnings;
+}
+
+export function getDraftTemplate(draftId: string): GmailDraftTemplate {
+  return withTiming("kissMailMerge.getDraftTemplate", { draftId }, () => {
+    const draft = GmailApp.getDraft(draftId);
+    if (!draft) {
+      throw new Error("Draft not found.");
+    }
+    const message = draft.getMessage();
+    const htmlBody = message.getBody() || "";
+    return {
+      id: draft.getId(),
+      subject: message.getSubject() || "",
+      htmlBody,
+      warnings: getDraftWarnings(htmlBody),
+    };
+  });
+}
+
+function getBodyTemplate(config: MailMergeConfig): string {
+  if (config.contentSource === "draft") {
+    const draftId = String(config.draftId || "").trim();
+    if (!draftId) {
+      throw new Error("No Gmail draft selected.");
+    }
+    return getDraftTemplate(draftId).htmlBody;
+  }
+  return config.template;
 }
 
 export function enableAutoReceiptChecks(sheetName?: string): MailMergeConfig {
@@ -369,7 +433,8 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
   }
 
   const config = getMergeSettings().table as MailMergeConfig;
-  if (!config.template || !config.subject) {
+  const bodyTemplate = getBodyTemplate(config);
+  if (!bodyTemplate || !config.subject) {
     throw new Error("Missing template or subject. Please save your configuration and template first.");
   }
 
@@ -400,7 +465,7 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
     }
   });
 
-  sendEmailFromTemplate(testAddress, config.subject, config.template, rowObject, false);
+  sendEmailFromTemplate(testAddress, config.subject, bodyTemplate, rowObject, false);
   return { row: Number(rowNumber), to: testAddress };
 }
 
@@ -415,11 +480,15 @@ export function doMerge(sheetName?: string): MailMergeResult {
   }
 
   const config = toMailMergeConfig(sheet.getName(), getMergeSettings().table as Record<string, unknown>);
-  if (!config.template || !config.to || !config.subject) {
+  const bodyTemplate = getBodyTemplate(config);
+  if (!bodyTemplate || !config.to || !config.subject) {
     throw new Error("Missing template, recipient, or subject. Open the sidebar and save configuration first.");
   }
 
-  const result = doMailMerge(sheet, config);
+  const result = doMailMerge(sheet, {
+    ...config,
+    template: bodyTemplate,
+  });
   syncAutoReceiptMonitoring(sheet, config);
   return result;
 }

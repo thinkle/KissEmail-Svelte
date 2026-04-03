@@ -1,4 +1,5 @@
 export type SerializableCellValue = string | number | boolean | null;
+export type ContentSource = "template" | "draft";
 
 export interface MailMergeConfig {
   jobName: string;
@@ -12,6 +13,8 @@ export interface MailMergeConfig {
   mergeFormula: string;
   trackReceipt: boolean;
   autoCheckReceipts: boolean;
+  contentSource: ContentSource;
+  draftId: string;
 }
 
 export interface SaveMailMergeConfigInput {
@@ -25,6 +28,8 @@ export interface SaveMailMergeConfigInput {
   mergeFormula: string;
   trackReceipt: boolean;
   autoCheckReceipts: boolean;
+  contentSource: ContentSource;
+  draftId: string;
 }
 
 export interface ReceiptStatus {
@@ -52,6 +57,32 @@ export interface ReceiptSummary {
   pending: number;
 }
 
+export interface CapabilityStatus {
+  available: boolean;
+  authUrl?: string | null;
+}
+
+export interface AppCapabilities {
+  basicMailMerge: CapabilityStatus;
+  receiptChecks: CapabilityStatus;
+  receiptScheduling: CapabilityStatus;
+  gmailDrafts: CapabilityStatus;
+}
+
+export interface GmailDraftSummary {
+  id: string;
+  subject: string;
+  to: string;
+  updatedAt: string;
+}
+
+export interface GmailDraftTemplate {
+  id: string;
+  subject: string;
+  htmlBody: string;
+  warnings: string[];
+}
+
 export interface SheetConfigState {
   config: MailMergeConfig;
   sheet: string;
@@ -76,6 +107,7 @@ export interface SidebarStatus {
   quota: number;
   autoReceiptStatus?: AutoReceiptStatus;
   receiptSummary?: ReceiptSummary;
+  capabilities?: AppCapabilities;
 }
 
 export interface SheetInfo extends SheetShell, SheetSampleRows, SidebarStatus {}

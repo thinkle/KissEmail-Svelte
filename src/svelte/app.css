@@ -18,6 +18,10 @@
   --button-border-radius: 16px;
   --control-bg: var(--material-color-purple-50);
   --menu-bg: var(--control-bg);
+  --danger-bg: var(--material-color-pink-600);
+  --danger-fg: white;
+  --warning-bg: var(--material-color-pink-700);
+  --warning-fg: white;
 }
 
 body {

@@ -1,4 +1,5 @@
 import type {
+  ContentSource,
   MailMergeConfig,
   SerializableCellValue,
   SheetRawRows,
@@ -126,6 +127,26 @@ export function renderPreview(
   });
 }
 
+export function extractTemplateFields(html: string): string[] {
+  return Array.from(
+    new Set(
+      Array.from(html.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g), (match) => match[1]),
+    ),
+  );
+}
+
+export function getTemplateWarnings(
+  html: string,
+  headers: string[],
+  additionalWarnings: string[] = [],
+): string[] {
+  const missingFields = extractTemplateFields(html)
+    .filter((field) => !headers.includes(field))
+    .map((field) => `Missing column for field {{${field}}}.`);
+
+  return Array.from(new Set([...missingFields, ...additionalWarnings]));
+}
+
 export function getSampleRowsFromRaw(
   rawRows: SheetRawRows,
   headerRows: number,
@@ -157,8 +178,12 @@ export function getTestRowsFromRaw(
 }
 
 export function configIsReady(config: MailMergeConfig): boolean {
+  const hasContent =
+    config.contentSource === "draft"
+      ? Boolean(config.draftId.trim())
+      : Boolean(config.template.trim());
   return Boolean(
-    config.template.trim() &&
+    hasContent &&
       config.to.trim() &&
       config.subject.trim() &&
       (!config.useMergeIf || config.mergeFormula.trim())

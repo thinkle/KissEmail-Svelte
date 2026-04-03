@@ -1,4 +1,6 @@
 import type {
+  GmailDraftSummary,
+  GmailDraftTemplate,
   CheckReceiptsResult,
   MailMergeConfig,
   MailMergeResult,
@@ -17,6 +19,7 @@ import {
   debugReceipt,
   doMerge,
   enableAutoReceiptChecks,
+  getDraftTemplate,
   getRawRows,
   getSheetConfig,
   getSheetHeaders,
@@ -25,6 +28,7 @@ import {
   getSheetInfo,
   getSidebarStatus,
   getTestRows,
+  listRecentDrafts,
   saveConfig,
   saveTemplate,
   sendTestEmail,
@@ -68,19 +72,20 @@ export function loadSidebarStatus(): SidebarStatus {
   return withTiming("api.loadSidebarStatus", {}, () => getSidebarStatus());
 }
 
+export function loadRecentDrafts(limit?: number): GmailDraftSummary[] {
+  return withTiming("api.loadRecentDrafts", { limit: limit ?? null }, () =>
+    listRecentDrafts(limit)
+  );
+}
+
+export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
+  return withTiming("api.loadDraftTemplate", { draftId }, () =>
+    getDraftTemplate(draftId)
+  );
+}
+
 export function saveMailMergeConfig(
-  settings: {
-    jobName: string;
-    headerRows: number;
-    to: string;
-    cc: string;
-    bcc: string;
-    subject: string;
-    useMergeIf: boolean;
-    mergeFormula: string;
-    trackReceipt: boolean;
-    autoCheckReceipts: boolean;
-  }
+  settings: Partial<import("../shared/mailMerge").SaveMailMergeConfigInput>
 ): MailMergeConfig {
   return withTiming("api.saveMailMergeConfig", {}, () => saveConfig(settings));
 }

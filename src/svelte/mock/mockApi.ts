@@ -1,5 +1,8 @@
 import type {
+  AppCapabilities,
   CheckReceiptsResult,
+  GmailDraftSummary,
+  GmailDraftTemplate,
   MailMergeConfig,
   SheetConfigState,
   SheetHeaders,
@@ -18,6 +21,26 @@ import {
 } from "./mockScenarios";
 
 const state = createMockScenarioState();
+const mockCapabilities: AppCapabilities = {
+  basicMailMerge: { available: true },
+  receiptChecks: { available: true },
+  receiptScheduling: { available: true },
+  gmailDrafts: { available: true },
+};
+const mockDrafts: GmailDraftSummary[] = [
+  {
+    id: "draft-welcome",
+    subject: "Welcome {{FirstName}}",
+    to: "",
+    updatedAt: "2026-04-03T10:30:00.000Z",
+  },
+  {
+    id: "draft-followup",
+    subject: "Following up",
+    to: "",
+    updatedAt: "2026-04-02T15:45:00.000Z",
+  },
+];
 
 function openMockDialog() {
   if (typeof window === "undefined") {
@@ -66,6 +89,28 @@ export function loadSidebarStatus(): SidebarStatus {
     quota: state.sheetInfo.quota,
     autoReceiptStatus: state.sheetInfo.autoReceiptStatus,
     receiptSummary: state.sheetInfo.receiptSummary,
+    capabilities: mockCapabilities,
+  });
+}
+
+export function loadRecentDrafts(limit = 20): GmailDraftSummary[] {
+  return structuredClone(mockDrafts.slice(0, limit));
+}
+
+export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
+  const body =
+    draftId === "draft-followup"
+      ? "<p>Hi {{PreferredName}},</p><p>Your advisor {{AdvisorName}} asked us to check in.</p>"
+      : "<p>Dear {{FirstName}},</p><p>Welcome to our program.</p><p><img src=\"https://example.com/logo.png\" alt=\"Logo\"></p>";
+  return structuredClone({
+    id: draftId,
+    subject:
+      mockDrafts.find((draft) => draft.id === draftId)?.subject ?? "(No subject)",
+    htmlBody: body,
+    warnings:
+      draftId === "draft-followup"
+        ? ["This draft references fields that are not present in the current sheet."]
+        : [],
   });
 }
 

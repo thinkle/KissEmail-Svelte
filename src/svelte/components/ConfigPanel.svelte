@@ -51,6 +51,8 @@
     specialConditions = [],
     trackReceipt = $bindable(false),
     autoCheckReceipts = $bindable(false),
+    canCheckReceipts = true,
+    canScheduleReceipts = true,
     onSaveConfig,
     onToggleEdit,
   }: {
@@ -75,6 +77,8 @@
     specialConditions?: SpecialCondition[];
     trackReceipt?: boolean;
     autoCheckReceipts?: boolean;
+    canCheckReceipts?: boolean;
+    canScheduleReceipts?: boolean;
     onSaveConfig: () => void;
     onToggleEdit: () => void;
   } = $props();
@@ -309,6 +313,7 @@
         <Stack>
           <Checkbox
             checked={trackReceipt}
+            disabled={!canCheckReceipts}
             onchange={(event) => {
               trackReceipt = (event.currentTarget as HTMLInputElement).checked;
               if (!trackReceipt) {
@@ -318,9 +323,14 @@
           >
             Track email opens (1×1 pixel)
           </Checkbox>
-          <Checkbox bind:checked={autoCheckReceipts} disabled={!trackReceipt}>
+          <Checkbox bind:checked={autoCheckReceipts} disabled={!trackReceipt || !canScheduleReceipts}>
             Automatically check receipts hourly
           </Checkbox>
+          {#if !canCheckReceipts}
+            <p>Receipt tracking requires external-request permission.</p>
+          {:else if !canScheduleReceipts}
+            <p>Hourly auto-check requires trigger permission.</p>
+          {/if}
           <details>
             <summary style="cursor:pointer;font-size:0.85em;color:#666;">About tracking</summary>
             <p style="font-size:0.85em;color:#555;margin:0.5em 0 0;">
