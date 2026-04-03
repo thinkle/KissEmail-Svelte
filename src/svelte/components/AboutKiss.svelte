@@ -8,7 +8,7 @@
 </script>
 
 <TextLayout>
-  <h2>About KISS Mail Merge</h2>
+  <h2>About <span class="brand">KISS Mail Merge</span></h2>
   <p>
     KISS (Keep It Simple, Stupid) Mail Merge is meant to keep mail merge as
     <i>simple</i> as possible.
@@ -61,19 +61,18 @@
   <p>
     Most “advanced” mail merge features belong in the spreadsheet, not in the
     mail merge tool. Building them in here would be like bolting a pocket
-    calculator onto a supercomputer. Google Sheets is already the power tool:
-    it can calculate, transform, filter, and generate exactly the data you
-    want. KISS Mail Merge should stay focused on one job: turning that prepared
-    data into email.
+    calculator onto a supercomputer. Google Sheets is already the power tool: it
+    can calculate, transform, filter, and generate exactly the data you want.
+    KISS Mail Merge should stay focused on one job: turning that prepared data
+    into email.
   </p>
   <p>
     So when your needs get more complex, the usual answer is helper columns,
     formulas, and generated HTML in the sheet itself. Want different paragraphs
     for different recipients? Generate them in a column. Want complex sending
-    rules? Compute them in the sheet. If you get stuck, ask an LLM for a
-    formula or sheet layout. As long as it understands that the end result is
-    spreadsheet columns feeding an HTML email template, you’ll be in good
-    shape.
+    rules? Compute them in the sheet. If you get stuck, ask an LLM for a formula
+    or sheet layout. As long as it understands that the end result is
+    spreadsheet columns feeding an HTML email template, you’ll be in good shape.
   </p>
 </TextLayout>
 
