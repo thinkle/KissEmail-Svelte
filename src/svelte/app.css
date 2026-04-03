@@ -22,6 +22,10 @@
   --danger-fg: white;
   --warning-bg: var(--material-color-pink-700);
   --warning-fg: white;
+  --tab-bg: var(--material-color-purple-100);
+  --tab-fg: var(--material-color-purple-800);
+  --tab-active-bg: var(--material-color-purple-900);
+  --tab-active-fg: var(--material-color-purple-50);
 }
 
 body {

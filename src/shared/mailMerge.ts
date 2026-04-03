@@ -81,6 +81,7 @@ export interface GmailDraftTemplate {
   subject: string;
   htmlBody: string;
   warnings: string[];
+  previewInlineImages?: Record<string, string>;
 }
 
 export interface SheetConfigState {

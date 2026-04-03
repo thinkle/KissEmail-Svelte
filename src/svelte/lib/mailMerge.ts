@@ -1,10 +1,18 @@
 import type {
-  ContentSource,
   MailMergeConfig,
   SerializableCellValue,
   SheetRawRows,
   TestRow,
 } from "../../shared/mailMerge";
+
+export type TemplateWarningReport = {
+  missingFields: string[];
+  suspiciousPlaceholders: Array<{
+    found: string;
+    suggestedField: string;
+  }>;
+  notices: string[];
+};
 
 export type MergeCondition = {
   selectedHeader: string;
@@ -127,6 +135,23 @@ export function renderPreview(
   });
 }
 
+export function rewriteCidImagesForPreview(
+  html: string,
+  previewInlineImages: Record<string, string> = {},
+): string {
+  if (!html || !Object.keys(previewInlineImages).length) {
+    return html;
+  }
+
+  return html.replace(
+    /\bsrc\s*=\s*(["'])cid:([^"']+)\1/gi,
+    (match, quote, cid) => {
+      const imageUrl = previewInlineImages[cid];
+      return imageUrl ? `src=${quote}${imageUrl}${quote}` : match;
+    },
+  );
+}
+
 export function extractTemplateFields(html: string): string[] {
   return Array.from(
     new Set(
@@ -135,16 +160,43 @@ export function extractTemplateFields(html: string): string[] {
   );
 }
 
-export function getTemplateWarnings(
+function extractSuspiciousPlaceholders(html: string): Array<{
+  found: string;
+  suggestedField: string;
+}> {
+  const patterns = [
+    /<<\s*([A-Za-z][\w.]*)\s*>>/g,
+    /&lt;&lt;\s*([A-Za-z][\w.]*)\s*&gt;&gt;/gi,
+    /(?<!\{)\{\s*([A-Za-z][\w.]*)\s*\}(?!\})/g,
+    /\[\[\s*([A-Za-z][\w.]*)\s*\]\]/g,
+  ];
+
+  return Array.from(
+    new Set(
+      patterns.flatMap((pattern) =>
+        Array.from(html.matchAll(pattern), (match) =>
+          JSON.stringify({
+            found: match[0],
+            suggestedField: match[1],
+          }),
+        ),
+      ),
+    ),
+  ).map((value) => JSON.parse(value) as { found: string; suggestedField: string });
+}
+
+export function getTemplateWarningReport(
   html: string,
   headers: string[],
   additionalWarnings: string[] = [],
-): string[] {
-  const missingFields = extractTemplateFields(html)
-    .filter((field) => !headers.includes(field))
-    .map((field) => `Missing column for field {{${field}}}.`);
-
-  return Array.from(new Set([...missingFields, ...additionalWarnings]));
+): TemplateWarningReport {
+  return {
+    missingFields: extractTemplateFields(html).filter(
+      (field) => !headers.includes(field),
+    ),
+    suspiciousPlaceholders: extractSuspiciousPlaceholders(html),
+    notices: Array.from(new Set(additionalWarnings)),
+  };
 }
 
 export function getSampleRowsFromRaw(

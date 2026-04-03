@@ -2,7 +2,7 @@ const IDX = "index.html";
 const APPNAME = "KISS Mail Merge";
 
 import { getAddOnEnvironment } from "./addOn";
-import { getSheetConfig } from "./kissMailMerge";
+import { getSheetShell } from "./kissMailMerge";
 
 function withAppContext(context: Record<string, unknown>) {
   return JSON.stringify(context);
@@ -26,7 +26,7 @@ export function showSidebar() {
     addOn: "Sheets",
     container: "sidebar",
     view: "sidebar",
-    initialSheetConfig: getSheetConfig(),
+    initialSheetShell: getSheetShell(),
   });
   const html = template.evaluate().setTitle(APPNAME);
   SpreadsheetApp.getUi().showSidebar(html);
@@ -72,7 +72,7 @@ export function showDialog(title: string = APPNAME, modal = true) {
     container: "dialog",
     mode: modal ? "modal" : "modeless",
     view: "editor",
-    initialSheetConfig: getSheetConfig(),
+    initialSheetShell: getSheetShell(),
   });
   const html = template.evaluate().setWidth(960).setHeight(720);
   if (modal) {

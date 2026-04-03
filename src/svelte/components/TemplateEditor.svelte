@@ -14,6 +14,7 @@
   } from "contain-css-svelte";
   import EmailFrame from "./EmailFrame.svelte";
   import TemplateWarnings from "./TemplateWarnings.svelte";
+  import type { TemplateWarningReport } from "../lib/mailMerge";
   import {
     FONT_OPTIONS,
     FONT_SIZE_OPTIONS,
@@ -25,7 +26,7 @@
     headers = [],
     templateHtml = $bindable(""),
     previewHtml = "",
-    warnings = [],
+    warningReport = { missingFields: [], suspiciousPlaceholders: [], notices: [] },
     mode = "sidebar",
     onOpenEditor,
     onSaveTemplate,
@@ -33,7 +34,7 @@
     headers?: string[];
     templateHtml?: string;
     previewHtml?: string;
-    warnings?: string[];
+    warningReport?: TemplateWarningReport;
     mode?: "sidebar" | "editor";
     onOpenEditor?: () => void;
     onSaveTemplate?: () => void;
@@ -986,7 +987,7 @@
       </Stack>
     </Fieldset>
   {/if}
-  <TemplateWarnings {warnings} />
+  <TemplateWarnings report={warningReport} />
   {#if showPreview}
     <div class="email-preview"><EmailFrame html={previewHtml} /></div>
   {:else if showSource}

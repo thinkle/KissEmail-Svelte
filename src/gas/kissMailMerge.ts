@@ -17,7 +17,11 @@ import type {
 } from "../shared/mailMerge";
 import { getCapabilities } from "./capabilities";
 import { ConfigurationSheet } from "./configurationSheet";
-import { applyTemplate, sendEmailFromTemplate } from "./emailer";
+import {
+  applyTemplate,
+  sendEmailFromTemplate,
+  type EmailSendAssets,
+} from "./emailer";
 import {
   checkEmailReceipts,
   debugReceiptStatus,
@@ -30,6 +34,11 @@ import { TRACKING_URL } from "./trackingConfig";
 import { cleanupObject, withTiming } from "./utils";
 
 const CONFIG_SHEET_SUFFIX = " Mail Merge Config";
+
+type DraftSendSource = {
+  htmlBody: string;
+  assets?: EmailSendAssets;
+};
 
 /**
  * Returns the active sheet, but if the user has a config sheet open,
@@ -229,7 +238,7 @@ export function getRawRows(limit = 60): SheetRawRows {
     const rowCount = Math.min(totalRows - 1, limit);
     const values = sheet
       .getRange(rowOffset + 1, columnOffset, rowCount, totalColumns)
-      .getValues();
+      .getDisplayValues();
 
     return cleanupObject({
       rowNumbers: Array.from({ length: rowCount }, (_, index) => rowOffset + 1 + index),
@@ -283,12 +292,97 @@ export function listRecentDrafts(limit = 20): GmailDraftSummary[] {
 function getDraftWarnings(htmlBody: string): string[] {
   const warnings: string[] = [];
   if (/src\s*=\s*["']cid:/i.test(htmlBody)) {
-    warnings.push("This draft contains embedded images and may not round-trip cleanly.");
+    warnings.push(
+      "This draft contains embedded Gmail images (cid:...). KISS will try to include them when sending.",
+    );
   }
   if (/src\s*=\s*["']data:image\//i.test(htmlBody)) {
-    warnings.push("This draft includes data-URI images, which can be large and fragile in sheet-stored HTML.");
+    warnings.push(
+      "This draft includes data-URI images. Some email clients handle these unreliably.",
+    );
   }
   return warnings;
+}
+
+function extractInlineImageIds(rawContent: string): string[] {
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const headerPattern = /^(Content-ID|X-Attachment-Id):\s*<?([^>\r\n]+)>?/gim;
+
+  for (const match of rawContent.matchAll(headerPattern)) {
+    const id = match[2]?.trim();
+    if (!id || seen.has(id)) {
+      continue;
+    }
+    seen.add(id);
+    ids.push(id);
+  }
+
+  return ids;
+}
+
+function getDraftSendSource(draftId: string): DraftSendSource {
+  return withTiming("kissMailMerge.getDraftSendSource", { draftId }, () => {
+    const draft = GmailApp.getDraft(draftId);
+    if (!draft) {
+      throw new Error("Draft not found.");
+    }
+
+    const message = draft.getMessage();
+    const htmlBody = message.getBody() || "";
+
+    const attachments = message
+      .getAttachments({ includeInlineImages: false, includeAttachments: true })
+      .map((attachment) => attachment.copyBlob());
+    const inlineBlobs = message
+      .getAttachments({ includeInlineImages: true, includeAttachments: false })
+      .map((attachment) => attachment.copyBlob());
+    const rawContent = message.getRawContent();
+    const inlineIds = extractInlineImageIds(rawContent);
+    const inlineImages: Record<string, GoogleAppsScript.Base.BlobSource> = {};
+
+    inlineBlobs.forEach((blob, index) => {
+      const cid = inlineIds[index];
+      if (!cid) {
+        return;
+      }
+      inlineImages[cid] = blob;
+    });
+
+    const assets: EmailSendAssets = {};
+    if (attachments.length) {
+      assets.attachments = attachments;
+    }
+    if (Object.keys(inlineImages).length) {
+      assets.inlineImages = inlineImages;
+    }
+
+    return {
+      htmlBody,
+      assets: Object.keys(assets).length ? assets : undefined,
+    };
+  });
+}
+
+function buildDraftPreviewInlineImages(
+  rawContent: string,
+  inlineBlobs: GoogleAppsScript.Base.Blob[],
+): Record<string, string> {
+  const inlineIds = extractInlineImageIds(rawContent);
+  const previewInlineImages: Record<string, string> = {};
+
+  inlineBlobs.forEach((blob, index) => {
+    const cid = inlineIds[index];
+    if (!cid) {
+      return;
+    }
+    const contentType = blob.getContentType() || "application/octet-stream";
+    const bytes = blob.getBytes();
+    const base64 = Utilities.base64Encode(bytes);
+    previewInlineImages[cid] = `data:${contentType};base64,${base64}`;
+  });
+
+  return previewInlineImages;
 }
 
 export function getDraftTemplate(draftId: string): GmailDraftTemplate {
@@ -299,24 +393,29 @@ export function getDraftTemplate(draftId: string): GmailDraftTemplate {
     }
     const message = draft.getMessage();
     const htmlBody = message.getBody() || "";
+    const rawContent = message.getRawContent();
+    const inlineBlobs = message
+      .getAttachments({ includeInlineImages: true, includeAttachments: false })
+      .map((attachment) => attachment.copyBlob());
     return {
       id: draft.getId(),
       subject: message.getSubject() || "",
       htmlBody,
       warnings: getDraftWarnings(htmlBody),
+      previewInlineImages: buildDraftPreviewInlineImages(rawContent, inlineBlobs),
     };
   });
 }
 
-function getBodyTemplate(config: MailMergeConfig): string {
+function getBodySource(config: MailMergeConfig): DraftSendSource {
   if (config.contentSource === "draft") {
     const draftId = String(config.draftId || "").trim();
     if (!draftId) {
       throw new Error("No Gmail draft selected.");
     }
-    return getDraftTemplate(draftId).htmlBody;
+    return getDraftSendSource(draftId);
   }
-  return config.template;
+  return { htmlBody: config.template };
 }
 
 export function enableAutoReceiptChecks(sheetName?: string): MailMergeConfig {
@@ -433,7 +532,8 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
   }
 
   const config = getMergeSettings().table as MailMergeConfig;
-  const bodyTemplate = getBodyTemplate(config);
+  const draftSource = getBodySource(config);
+  const bodyTemplate = draftSource.htmlBody;
   if (!bodyTemplate || !config.subject) {
     throw new Error("Missing template or subject. Please save your configuration and template first.");
   }
@@ -453,10 +553,10 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
 
   const headers = sheet
     .getRange(rowOffset, dataRange.getColumn(), 1, dataRange.getNumColumns())
-    .getValues()[0];
+    .getDisplayValues()[0];
   const rowValues = sheet
     .getRange(Number(rowNumber), dataRange.getColumn(), 1, dataRange.getNumColumns())
-    .getValues()[0];
+    .getDisplayValues()[0];
 
   const rowObject: Record<string, unknown> = {};
   headers.forEach((header, index) => {
@@ -465,7 +565,16 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
     }
   });
 
-  sendEmailFromTemplate(testAddress, config.subject, bodyTemplate, rowObject, false);
+  sendEmailFromTemplate(
+    testAddress,
+    config.subject,
+    bodyTemplate,
+    rowObject,
+    false,
+    "",
+    "",
+    draftSource.assets,
+  );
   return { row: Number(rowNumber), to: testAddress };
 }
 
@@ -480,7 +589,8 @@ export function doMerge(sheetName?: string): MailMergeResult {
   }
 
   const config = toMailMergeConfig(sheet.getName(), getMergeSettings().table as Record<string, unknown>);
-  const bodyTemplate = getBodyTemplate(config);
+  const draftSource = getBodySource(config);
+  const bodyTemplate = draftSource.htmlBody;
   if (!bodyTemplate || !config.to || !config.subject) {
     throw new Error("Missing template, recipient, or subject. Open the sidebar and save configuration first.");
   }
@@ -488,7 +598,7 @@ export function doMerge(sheetName?: string): MailMergeResult {
   const result = doMailMerge(sheet, {
     ...config,
     template: bodyTemplate,
-  });
+  }, draftSource.assets);
   syncAutoReceiptMonitoring(sheet, config);
   return result;
 }

@@ -47,18 +47,21 @@
     buildMergeFormula,
     configIsReady,
     defaultMergeCondition,
-    getTemplateWarnings,
+    getTemplateWarningReport,
     getSampleRowsFromRaw,
     getTestRowsFromRaw,
     mergeConditionFromConfig,
     renderPreview,
+    rewriteCidImagesForPreview,
     type MergeCondition,
   } from "../lib/mailMerge";
 
   let {
     initialSheetConfig,
+    initialSheetShell,
   }: {
     initialSheetConfig?: SheetConfigState;
+    initialSheetShell?: SheetShell;
   } = $props();
 
   const emptyConfig = (): MailMergeConfig => ({
@@ -145,6 +148,7 @@
     loadingTemplate: false,
     templateHtml: "",
     warnings: [] as string[],
+    previewInlineImages: {} as Record<string, string>,
     error: "",
   });
 
@@ -161,14 +165,17 @@
 
   const activeTemplateHtml = $derived(
     config.contentSource === "draft"
-      ? draftState.templateHtml
+      ? rewriteCidImagesForPreview(
+          draftState.templateHtml,
+          draftState.previewInlineImages,
+        )
       : config.template,
   );
   const templateWarnings = $derived.by(() =>
-    getTemplateWarnings(config.template, sheetData.headers),
+    getTemplateWarningReport(config.template, sheetData.headers),
   );
   const draftWarnings = $derived.by(() =>
-    getTemplateWarnings(
+    getTemplateWarningReport(
       draftState.templateHtml,
       sheetData.headers,
       draftState.warnings,
@@ -377,6 +384,7 @@
     if (!draftId) {
       draftState.templateHtml = "";
       draftState.warnings = [];
+      draftState.previewInlineImages = {};
       return;
     }
 
@@ -388,6 +396,7 @@
       }
       draftState.templateHtml = draft.htmlBody ?? "";
       draftState.warnings = draft.warnings ?? [];
+      draftState.previewInlineImages = draft.previewInlineImages ?? {};
       draftState.error = "";
     } catch (error) {
       if (token === refreshToken) {
@@ -434,6 +443,16 @@
     await loadDraftTemplate(draftId);
   }
 
+  async function reloadDraft() {
+    const token = refreshToken + 1;
+    refreshToken = token;
+    const jobs: Promise<void>[] = [loadRecentDrafts(token)];
+    if (config.draftId) {
+      jobs.push(loadDraftTemplate(config.draftId, token));
+    }
+    await Promise.all(jobs);
+  }
+
   function loadSidebarSupplements(token = refreshToken) {
     void loadSheetHeaders(token);
     void loadRawRows(token);
@@ -464,7 +483,12 @@
     refreshToken = token;
 
     const emailPromise = GoogleAppsScript.getActiveUserEmail().catch(() => "");
-    if (initialSheetConfig) {
+    if (initialSheetShell) {
+      hydrateConfig(initialSheetShell);
+      hydrateHeaders(initialSheetShell);
+      ui.loading = false;
+      ui.errorMessage = "";
+    } else if (initialSheetConfig) {
       hydrateConfig(initialSheetConfig);
       ui.loading = false;
       ui.errorMessage = "";
@@ -682,7 +706,7 @@
   --button-font-size="12px"
   --heading-font-size="1.1rem"
 >
-  {#if sheetData.headers.length === 0}
+  {#if !ui.loading && sheetData.headers.length === 0}
     <Container padding="8px">
       <Inline
         ><h1>Your Sheet is Empty!</h1>
@@ -717,7 +741,7 @@
             Mail Merge
           </h1>
         </Inline>
-        <Tooltip tooltipText="Reload">
+        <Tooltip tooltipText="Reload sheet data">
           <MiniButton onclick={doSetup}>
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -829,7 +853,7 @@
                 headers={sheetData.headers}
                 bind:templateHtml={config.template}
                 {previewHtml}
-                warnings={templateWarnings}
+                warningReport={templateWarnings}
                 onOpenEditor={openEditor}
               />
             {:else}
@@ -839,23 +863,46 @@
                     <p>
                       Use a Gmail draft as the body source for this mail merge.
                     </p>
-                    <Select
-                      value={config.draftId}
-                      onchange={(event) =>
-                        void selectDraft(
-                          (event.currentTarget as HTMLSelectElement).value,
-                        )}
-                    >
-                      <Option value="">Select a draft...</Option>
-                      {#each draftState.drafts as draft}
-                        <Option value={draft.id}>
-                          {draft.subject}
-                          {draft.updatedAt
-                            ? `(${new Date(draft.updatedAt).toLocaleDateString()})`
-                            : ""}
-                        </Option>
-                      {/each}
-                    </Select>
+                    <Inline align="center">
+                      <Select
+                        value={config.draftId}
+                        onchange={(event) =>
+                          void selectDraft(
+                            (event.currentTarget as HTMLSelectElement).value,
+                          )}
+                      >
+                        <Option value="">Select a draft...</Option>
+                        {#each draftState.drafts as draft}
+                          <Option value={draft.id}>
+                            {draft.subject}
+                            {draft.updatedAt
+                              ? `(${new Date(draft.updatedAt).toLocaleDateString()})`
+                              : ""}
+                          </Option>
+                        {/each}
+                      </Select>
+                      <Tooltip tooltipText="Reload drafts from Gmail">
+                        <MiniButton
+                          onclick={() => void reloadDraft()}
+                          disabled={
+                            draftState.loadingList ||
+                            draftState.loadingTemplate
+                          }
+                        >
+                          <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                            width="16"
+                            height="16"
+                          >
+                            <path
+                              d="M12 4V1L8 5l3.99 4V6c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6h-2c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"
+                            />
+                          </svg>
+                        </MiniButton>
+                      </Tooltip>
+                    </Inline>
                     {#if draftState.loadingList}
                       <p>Loading drafts...</p>
                     {/if}
@@ -866,7 +913,7 @@
                   {#if config.draftId}
                     <Stack>
                       <TemplateWarnings
-                        warnings={draftWarnings}
+                        report={draftWarnings}
                         title="Draft warnings"
                       />
                       {#if draftState.loadingTemplate}

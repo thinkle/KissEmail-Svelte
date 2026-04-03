@@ -98,19 +98,26 @@ export function loadRecentDrafts(limit = 20): GmailDraftSummary[] {
 }
 
 export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
-  const body =
-    draftId === "draft-followup"
-      ? "<p>Hi {{PreferredName}},</p><p>Your advisor {{AdvisorName}} asked us to check in.</p>"
-      : "<p>Dear {{FirstName}},</p><p>Welcome to our program.</p><p><img src=\"https://example.com/logo.png\" alt=\"Logo\"></p>";
+  const isFollowup = draftId === "draft-followup";
+  const body = isFollowup
+    ? "<p>Hi {{PreferredName}},</p><p>Your advisor {AdvisorName} asked us to check in.</p><p>Reference: &lt;&lt;CaseManager&gt;&gt;</p><p><img src=\"cid:followup-inline-image\" alt=\"Inline image\"></p>"
+    : "<p>Dear {{FirstName}},</p><p>Welcome to our program.</p><p><img src=\"https://example.com/logo.png\" alt=\"Logo\"></p>";
   return structuredClone({
     id: draftId,
     subject:
       mockDrafts.find((draft) => draft.id === draftId)?.subject ?? "(No subject)",
     htmlBody: body,
-    warnings:
-      draftId === "draft-followup"
-        ? ["This draft references fields that are not present in the current sheet."]
-        : [],
+    warnings: isFollowup
+      ? [
+          "This draft contains embedded Gmail images (cid:...). KISS will try to include them when sending.",
+        ]
+      : [],
+    previewInlineImages: isFollowup
+      ? {
+          "followup-inline-image":
+            "data:image/svg+xml;utf8,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20width%3D%22240%22%20height%3D%22120%22%20viewBox%3D%220%200%20240%20120%22%3E%3Crect%20width%3D%22240%22%20height%3D%22120%22%20fill%3D%22%23efe2ff%22/%3E%3Ccircle%20cx%3D%2260%22%20cy%3D%2260%22%20r%3D%2228%22%20fill%3D%22%23933bd6%22/%3E%3Cpath%20d%3D%22M108%2040h88v12h-88zm0%2020h72v12h-72zm0%2020h96v12h-96z%22%20fill%3D%22%23642aa8%22/%3E%3C/svg%3E",
+        }
+      : {},
   });
 }
 

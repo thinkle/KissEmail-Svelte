@@ -13,14 +13,16 @@
   import TemplateEditor from "./TemplateEditor.svelte";
   import {
     getSampleRowsFromRaw,
-    getTemplateWarnings,
+    getTemplateWarningReport,
     renderPreview,
   } from "../lib/mailMerge";
 
   let {
     initialSheetConfig,
+    initialSheetShell,
   }: {
     initialSheetConfig?: SheetConfigState;
+    initialSheetShell?: SheetShell;
   } = $props();
 
   let ui = $state({
@@ -46,7 +48,7 @@
     ),
   );
   const warnings = $derived.by(() =>
-    getTemplateWarnings(editorState.templateHtml, editorState.headers),
+    getTemplateWarningReport(editorState.templateHtml, editorState.headers),
   );
 
   function setBusy(message: string) {
@@ -89,23 +91,36 @@
   async function loadEditorState() {
     ui.loading = true;
     try {
-      const configPromise = initialSheetConfig
-        ? Promise.resolve(initialSheetConfig)
-        : GoogleAppsScript.loadSheetConfig();
-      const headersPromise = GoogleAppsScript.loadSheetHeaders();
+      const shellPromise = initialSheetShell
+        ? Promise.resolve(initialSheetShell)
+        : null;
+      const configPromise = shellPromise
+        ? shellPromise
+        : initialSheetConfig
+          ? Promise.resolve(initialSheetConfig)
+          : GoogleAppsScript.loadSheetConfig();
+      const headersPromise = shellPromise
+        ? null
+        : GoogleAppsScript.loadSheetHeaders();
       const rawRowsPromise = GoogleAppsScript.loadRawRows(10);
       const config = await configPromise;
-      hydrateConfig(config);
+      if ("headers" in config) {
+        hydrateShell(config);
+      } else {
+        hydrateConfig(config);
+      }
       ui.errorMessage = "";
       ui.loading = false;
 
-      void headersPromise
-        .then((info) => {
-          hydrateHeaders(info);
-        })
-        .catch((error) => {
-          ui.errorMessage = formatError(error);
-        });
+      if (headersPromise) {
+        void headersPromise
+          .then((info) => {
+            hydrateHeaders(info);
+          })
+          .catch((error) => {
+            ui.errorMessage = formatError(error);
+          });
+      }
 
       void rawRowsPromise
         .then((info) => {
@@ -162,7 +177,7 @@
         headers={editorState.headers}
         bind:templateHtml={editorState.templateHtml}
         {previewHtml}
-        {warnings}
+        warningReport={warnings}
         onSaveTemplate={saveTemplate}
       />
     {/if}

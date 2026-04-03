@@ -1,9 +1,10 @@
-import type { SheetConfigState } from "../shared/mailMerge";
+import type { SheetConfigState, SheetShell } from "../shared/mailMerge";
 import type { AddOnContext } from "./lib/parseContext";
 
 export type AppContext = AddOnContext & {
   view?: "sidebar" | "editor";
   initialSheetConfig?: SheetConfigState;
+  initialSheetShell?: SheetShell;
 };
 
 export const DEFAULT_CONTEXT: AppContext = {

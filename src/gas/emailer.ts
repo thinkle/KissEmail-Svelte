@@ -1,5 +1,10 @@
 import { spreadsheetify } from "./utils";
 
+export type EmailSendAssets = {
+  attachments?: GoogleAppsScript.Base.BlobSource[];
+  inlineImages?: Record<string, GoogleAppsScript.Base.BlobSource>;
+};
+
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
@@ -8,7 +13,7 @@ export function sendEmail(
   email: string,
   subject: string,
   htmlBody: string,
-  options?: { cc?: string; bcc?: string }
+  options?: { cc?: string; bcc?: string } & EmailSendAssets
 ) {
   const params: GoogleAppsScript.Mail.MailAdvancedParameters & {
     to: string;
@@ -25,6 +30,12 @@ export function sendEmail(
   }
   if (options?.bcc) {
     params.bcc = options.bcc;
+  }
+  if (options?.attachments?.length) {
+    params.attachments = options.attachments;
+  }
+  if (options?.inlineImages && Object.keys(options.inlineImages).length) {
+    params.inlineImages = options.inlineImages;
   }
 
   MailApp.sendEmail(params);
@@ -73,12 +84,16 @@ export function sendEmailFromTemplate(
   fields: Record<string, unknown>,
   fixWhiteSpace = false,
   ccTemplate = "",
-  bccTemplate = ""
+  bccTemplate = "",
+  assets?: EmailSendAssets
 ) {
   const to = applyTemplate(emailTemplate, fields);
   const subject = applyTemplate(subjectTemplate, fields);
   const body = applyTemplate(template, fields, fixWhiteSpace);
-  const options: { cc?: string; bcc?: string } = {};
+  const options: { cc?: string; bcc?: string } & EmailSendAssets = {
+    attachments: assets?.attachments,
+    inlineImages: assets?.inlineImages,
+  };
   const cc = ccTemplate ? applyTemplate(ccTemplate, fields) : "";
   const bcc = bccTemplate ? applyTemplate(bccTemplate, fields) : "";
   if (cc) {

@@ -4,7 +4,11 @@ import type {
   MailMergeResult,
   ReceiptSummary,
 } from "../shared/mailMerge";
-import { embedTrackingPixel, sendEmailFromTemplate } from "./emailer";
+import {
+  embedTrackingPixel,
+  sendEmailFromTemplate,
+  type EmailSendAssets,
+} from "./emailer";
 import { TRACKING_URL } from "./trackingConfig";
 import { Table } from "./tableReader";
 
@@ -71,13 +75,15 @@ function checkForMergeHeader(
 }
 
 export function emailRow(
-  tableRow: Record<string, unknown>,
+  mergeFields: Record<string, unknown>,
+  writableRow: Record<string, unknown>,
   emailTemplate: string,
   subjectTemplate: string,
   bodyTemplate: string,
   ccTemplate = "",
   bccTemplate = "",
-  trackingPixelUrl?: string
+  trackingPixelUrl?: string,
+  assets?: EmailSendAssets
 ) {
   let body = bodyTemplate;
   let receiptId: string | undefined;
@@ -92,24 +98,27 @@ export function emailRow(
     emailTemplate,
     subjectTemplate,
     body,
-    tableRow,
+    mergeFields,
     false,
     ccTemplate,
-    bccTemplate
+    bccTemplate,
+    assets
   );
 
-  tableRow[MAIL_MERGE_STATUS_COLUMN] = STATUS_SENT;
+  writableRow[MAIL_MERGE_STATUS_COLUMN] = STATUS_SENT;
 
   if (receiptId) {
-    tableRow[MAIL_MERGE_RECEIPT_ID_COLUMN] = receiptId;
+    writableRow[MAIL_MERGE_RECEIPT_ID_COLUMN] = receiptId;
   }
 }
 
 export function doMailMerge(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  config: MailMergeConfig
+  config: MailMergeConfig,
+  assets?: EmailSendAssets
 ): MailMergeResult {
   const headers = checkForMergeHeader(sheet, config);
+  const displayValues = sheet.getDataRange().getDisplayValues();
 
   if (config.useMergeIf) {
     const mergeIfColumn = headers.indexOf(MAIL_MERGE_IF_COLUMN) + 1;
@@ -145,14 +154,20 @@ export function doMailMerge(
     }
 
     try {
+      const displayRow = displayValues[index] ?? [];
+      const mergeFields = Object.fromEntries(
+        headers.map((header, headerIndex) => [header, displayRow[headerIndex] ?? ""]),
+      );
       emailRow(
+        mergeFields,
         row,
         config.to,
         config.subject,
         config.template,
         config.cc,
         config.bcc,
-        trackingPixelUrl
+        trackingPixelUrl,
+        assets
       );
       successful += 1;
     } catch (error) {
