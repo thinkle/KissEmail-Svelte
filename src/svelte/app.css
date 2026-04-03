@@ -1,33 +1,70 @@
 @import "contain-css-svelte/vars/defaults.css";
-@import "contain-css-svelte/themes/purple.css";
 
+/* Optional theme experiments */
+/*@import "contain-css-svelte/vars/themes/material.css";*/
+/*
+@import "contain-css-svelte/themes/purple.css";
+*/
+
+/* App-level design tokens */
 :root {
+  /* Layout and sizing */
   font-size: 14px;
   --card-width-small: calc(100% - 4px);
   --card-margin: 2px;
-  --bar-border-bottom: none;
-  --bar-border-top: none;
-  --shadow-color: #99009944;
-  --button-bg: white;
-  --button-fg: var(--material-color-purple-800);
-  --stack-line-width: 100%; /* Workaround bug */
-  --hover-color-mix: #cc2222;
-  --hover-base-color-percentage: 55%;
-  --button-padding: 8px 4px;
+  --button-padding: 4px 8px;
   --select-padding: var(--button-padding);
   --button-border-radius: 16px;
+  --mini-button-size: 28px;
+  --mini-button-radius: 8px;
+  --button-radius: 8px;
+  --button-font-size: 16px;
+
+  /* Borders and surfaces */
+  --border: none;
+  --bar-border-bottom: none;
+  --bar-border-top: none;
+  /*--shadow-color: #99009944;*/
+
+  /* Core control colors */
+  --surface-bg: #f0f4f9;
+  --surface-fg: #222;
+  /*
+  --button-bg: white;
+  --button-fg: var(--material-color-purple-800);
   --control-bg: var(--material-color-purple-50);
   --menu-bg: var(--control-bg);
+  */
+  /* Hover behavior */
+  --hover-color-mix: black;
+  --hover-base-color-percentage: 85%;
+
+  --menu-item-bg: white;
+  --menu-item-fg: black;
+
+  /* Semantic colors */
   --danger-bg: var(--material-color-pink-600);
   --danger-fg: white;
   --warning-bg: var(--material-color-pink-700);
   --warning-fg: white;
-  --tab-bg: var(--material-color-purple-100);
+
+  --accordion-summary-bg: var(--material-color-pink-50);
+  --accordion-summary-open-bg: var(--material-color-pink-900);
+  --acordion-summary-fg: var(--material-color-pink-800);
+  --accordion-summary-open-fg: var(--material-color-pink-50);
+  --accordion-wrapper-border: 1px solid #ccc;
+  --brand-fg: var(--material-color-pink-a700);
+  --heading-fg: var(--brand-fg);
+  --tab-active-fg: var(--material-color-pink-900);
+
+  /* Tabs */
+  /* --tab-bg: var(--material-color-purple-100);
   --tab-fg: var(--material-color-purple-800);
   --tab-active-bg: var(--material-color-purple-900);
-  --tab-active-fg: var(--material-color-purple-50);
+  --tab-active-fg: var(--material-color-purple-50); */
 }
 
+/* Document defaults */
 body {
   margin: 0;
   font-size: 14px;
@@ -39,6 +76,7 @@ body {
   --tag-font-size: 10px;
 }
 
+/* Global element behavior */
 a {
   color: inherit;
 }
