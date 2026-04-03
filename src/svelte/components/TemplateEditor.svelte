@@ -70,6 +70,10 @@
   let activeTable = $state<HTMLTableElement | null>(null);
   let activeRow = $state<HTMLTableRowElement | null>(null);
   let savedRange = $state<Range | null>(null);
+  let suspendSelectionCapture = $state(false);
+  let linkSelectionRects = $state<
+    Array<{ left: number; top: number; width: number; height: number }>
+  >([]);
 
   const showPreview = $derived(previewOverride ?? mode === "sidebar");
   const normalizedPreviewRowIndex = $derived(
@@ -180,14 +184,60 @@
     updateTableSelection();
   }
 
+  function logSelectionDebug(event: string, extra: Record<string, unknown> = {}) {
+    const selection = window.getSelection();
+    const anchor =
+      selection?.anchorNode instanceof Element
+        ? selection.anchorNode
+        : selection?.anchorNode?.parentElement ?? null;
+    console.log(
+      "[TemplateEditor]",
+      event,
+      {
+        hasSelection: Boolean(selection?.rangeCount),
+        isCollapsed: selection?.isCollapsed ?? null,
+        anchorText: anchor?.textContent?.slice(0, 40) ?? null,
+        anchorTag: anchor?.tagName ?? null,
+        savedRangeText: savedRange?.toString() ?? null,
+        savedRangeCollapsed: savedRange?.collapsed ?? null,
+        ...extra,
+      },
+    );
+  }
+
+  function clearLinkSelectionHighlight() {
+    linkSelectionRects = [];
+  }
+
+  function updateLinkSelectionHighlight() {
+    if (!editorEl || !savedRange || savedRange.collapsed) {
+      clearLinkSelectionHighlight();
+      return;
+    }
+
+    const editorRect = editorEl.getBoundingClientRect();
+    linkSelectionRects = Array.from(savedRange.getClientRects())
+      .map((rect) => ({
+        left: rect.left - editorRect.left + editorEl.scrollLeft,
+        top: rect.top - editorRect.top + editorEl.scrollTop,
+        width: rect.width,
+        height: rect.height,
+      }))
+      .filter((rect) => rect.width > 0 && rect.height > 0);
+  }
+
   function restoreSelection() {
     const selection = window.getSelection();
     if (!selection || !savedRange) {
+      logSelectionDebug("restoreSelection.skipped", {
+        reason: !selection ? "no-selection" : "no-saved-range",
+      });
       return;
     }
 
     selection.removeAllRanges();
     selection.addRange(savedRange.cloneRange());
+    logSelectionDebug("restoreSelection.applied");
   }
 
   function updateTableSelection() {
@@ -196,12 +246,15 @@
       activeRow = null;
       return;
     }
+    if (suspendSelectionCapture) {
+      logSelectionDebug("updateTableSelection.suspended");
+      return;
+    }
 
     const selection = window.getSelection();
     if (!selection?.rangeCount) {
       activeTable = null;
       activeRow = null;
-      savedRange = null;
       return;
     }
 
@@ -212,16 +265,19 @@
     if (!element || !editorEl.contains(element)) {
       activeTable = null;
       activeRow = null;
-      savedRange = null;
       return;
     }
 
     savedRange = selection.getRangeAt(0).cloneRange();
+    logSelectionDebug("updateTableSelection.saved");
     activeTable = element.closest("table");
     activeRow = element.closest("tr");
     if (activeTable) {
       tableBorderStyle = getBorderStyleFromTable(activeTable);
       tableFullWidth = getTableWidthFromTable(activeTable);
+    }
+    if (showLinkTools) {
+      updateLinkSelectionHighlight();
     }
   }
 
@@ -485,6 +541,7 @@
   }
 
   function openLinkTools() {
+    updateTableSelection();
     const selection = window.getSelection();
     const selectedText = selection?.toString().trim() ?? "";
     linkText = selectedText;
@@ -492,6 +549,8 @@
       linkUrl = "https://";
     }
     showLinkTools = true;
+    updateLinkSelectionHighlight();
+    logSelectionDebug("openLinkTools", { selectedText });
   }
 
   function applyLink() {
@@ -499,10 +558,17 @@
       return;
     }
 
+    suspendSelectionCapture = true;
     editorEl.focus();
+    logSelectionDebug("applyLink.beforeRestore", {
+      linkUrl,
+      linkText,
+    });
     restoreSelection();
 
     if (!linkUrl.trim()) {
+      suspendSelectionCapture = false;
+      logSelectionDebug("applyLink.aborted", { reason: "empty-url" });
       return;
     }
 
@@ -524,7 +590,16 @@
     showLinkTools = false;
     linkUrl = "";
     linkText = "";
+    suspendSelectionCapture = false;
+    clearLinkSelectionHighlight();
     syncEditor();
+    logSelectionDebug("applyLink.complete");
+  }
+
+  function handleOpenLinkToolsMouseDown(event: MouseEvent) {
+    event.preventDefault();
+    logSelectionDebug("handleOpenLinkToolsMouseDown");
+    openLinkTools();
   }
 
   function formatHtml(html: string) {
@@ -797,7 +872,10 @@
               ></path>
             </svg>
           </MiniButton>
-          <MiniButton onclick={openLinkTools} aria-label="Insert link">
+          <MiniButton
+            onmousedown={handleOpenLinkToolsMouseDown}
+            aria-label="Insert link"
+          >
             <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
               <path
                 d="M6.5 10.5 5 12a2.12 2.12 0 0 1-3 0 2.12 2.12 0 0 1 0-3l2.5-2.5a2.12 2.12 0 0 1 3 0l.5.5-.88.88-.5-.5a.88.88 0 0 0-1.24 0L2.88 9.88a.88.88 0 0 0 0 1.24.88.88 0 0 0 1.24 0l1.5-1.5zm3-5L11 4a2.12 2.12 0 0 1 3 0 2.12 2.12 0 0 1 0 3l-2.5 2.5a2.12 2.12 0 0 1-3 0l-.5-.5.88-.88.5.5a.88.88 0 0 0 1.24 0l2.5-2.5a.88.88 0 0 0 0-1.24.88.88 0 0 0-1.24 0l-1.5 1.5zM5.75 8.88l4-4 .88.88-4 4z"
@@ -871,6 +949,7 @@
               showLinkTools = false;
               linkUrl = "";
               linkText = "";
+              clearLinkSelectionHighlight();
             }}
           >
             Cancel
@@ -1061,16 +1140,29 @@
     <textarea class="source-view" bind:this={sourceEl} bind:value={templateHtml}
     ></textarea>
   {:else if mode === "editor"}
-    <div
-      class="editor"
-      contenteditable="true"
-      use:editable={templateHtml}
-      bind:this={editorEl}
-      onfocus={updateTableSelection}
-      oninput={syncEditor}
-      onkeyup={updateTableSelection}
-      onmouseup={updateTableSelection}
-    ></div>
+    <div class="editor-shell">
+      <div
+        class="editor"
+        contenteditable="true"
+        use:editable={templateHtml}
+        bind:this={editorEl}
+        onfocus={updateTableSelection}
+        oninput={syncEditor}
+        onkeyup={updateTableSelection}
+        onmouseup={updateTableSelection}
+        onscroll={updateLinkSelectionHighlight}
+      ></div>
+      {#if showLinkTools && linkSelectionRects.length}
+        <div class="editor-selection-overlay" aria-hidden="true">
+          {#each linkSelectionRects as rect}
+            <div
+              class="editor-selection-rect"
+              style={`left:${rect.left}px;top:${rect.top}px;width:${rect.width}px;height:${rect.height}px;`}
+            ></div>
+          {/each}
+        </div>
+      {/if}
+    </div>
   {:else}
     <div class="email-preview"><EmailFrame html={templateHtml} /></div>
   {/if}
@@ -1081,6 +1173,10 @@
 </Stack>
 
 <style>
+  .editor-shell {
+    position: relative;
+  }
+
   .editor,
   .email-preview {
     border: 1px solid rgba(23, 48, 74, 0.14);
@@ -1097,6 +1193,21 @@
     font-size: 14px;
     line-height: 1.45;
     --line-width: none;
+    position: relative;
+    z-index: 1;
+  }
+
+  .editor-selection-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    z-index: 2;
+  }
+
+  .editor-selection-rect {
+    position: absolute;
+    background: color-mix(in srgb, #8ab4f8 55%, transparent);
+    border-radius: 2px;
   }
 
   .editor :global(p),
