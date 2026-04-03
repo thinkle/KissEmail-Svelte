@@ -36,8 +36,7 @@
   import BusyOverlay from "./BusyOverlay.svelte";
   import AboutKiss from "./AboutKiss.svelte";
   import ConfigPanel from "./ConfigPanel.svelte";
-  import EmailFrame from "./EmailFrame.svelte";
-  import FooterBar from "./FooterBar.svelte";
+import FooterBar from "./FooterBar.svelte";
   import ReceiptPanel from "./ReceiptPanel.svelte";
   import TemplateEditor from "./TemplateEditor.svelte";
   import TemplateWarnings from "./TemplateWarnings.svelte";
@@ -125,6 +124,7 @@
     receiptScheduling: { available: true },
     gmailDrafts: { available: false },
   });
+  let capabilitiesLoaded = $state(false);
   let receiptSummary = $state<ReceiptSummary>({
     tracked: 0,
     opened: 0,
@@ -287,6 +287,7 @@
       pending: 0,
     };
     capabilities = info.capabilities ?? capabilities;
+    capabilitiesLoaded = Boolean(info.capabilities);
   }
 
   async function loadSheetConfig(token = refreshToken) {
@@ -422,7 +423,11 @@
   }
 
   async function selectContentSource(source: "template" | "draft") {
-    if (source === "draft" && !capabilities.gmailDrafts.available) {
+    if (
+      source === "draft" &&
+      capabilitiesLoaded &&
+      !capabilities.gmailDrafts.available
+    ) {
       return;
     }
     config.contentSource = source;
@@ -821,14 +826,18 @@
               </TabItem>
               <TabItem
                 active={config.contentSource === "draft"}
-                disabled={!capabilities.gmailDrafts.available}
+                disabled={
+                  capabilitiesLoaded && !capabilities.gmailDrafts.available
+                }
                 onclick={() => void selectContentSource("draft")}
               >
                 Use Gmail Draft
               </TabItem>
             </TabBar>
 
-            {#if !capabilities.gmailDrafts.available}
+            {#if config.contentSource === "draft" &&
+              capabilitiesLoaded &&
+              !capabilities.gmailDrafts.available}
               <Card bg="var(--warning-bg)" fg="var(--warning-fg)">
                 <p>
                   Draft mode is not available without full Gmail permissions.
@@ -853,12 +862,19 @@
                 headers={sheetData.headers}
                 bind:templateHtml={config.template}
                 {previewHtml}
+                previewRows={sheetData.sampleRows}
+                previewRowNumbers={rawRows.rowNumbers.slice(
+                  Math.max(config.headerRows - 1, 0),
+                  Math.max(config.headerRows - 1, 0) + sheetData.sampleRows.length,
+                )}
                 warningReport={templateWarnings}
                 onOpenEditor={openEditor}
               />
             {:else}
               <Stack>
-                {#if capabilities.gmailDrafts.available}
+                {#if !capabilitiesLoaded}
+                  <p>Checking Gmail draft permissions...</p>
+                {:else if capabilities.gmailDrafts.available}
                   <Stack>
                     <p>
                       Use a Gmail draft as the body source for this mail merge.
@@ -912,14 +928,23 @@
                   </Stack>
                   {#if config.draftId}
                     <Stack>
-                      <TemplateWarnings
-                        report={draftWarnings}
-                        title="Draft warnings"
-                      />
                       {#if draftState.loadingTemplate}
                         <p>Loading draft preview...</p>
                       {:else}
-                        <EmailFrame html={previewHtml} title="Draft preview" />
+                        <TemplateEditor
+                          mode="sidebar"
+                          headers={sheetData.headers}
+                          templateHtml={draftState.templateHtml}
+                          {previewHtml}
+                          previewRows={sheetData.sampleRows}
+                          previewRowNumbers={rawRows.rowNumbers.slice(
+                            Math.max(config.headerRows - 1, 0),
+                            Math.max(config.headerRows - 1, 0) + sheetData.sampleRows.length,
+                          )}
+                          showOpenEditorButton={false}
+                          warningReport={draftWarnings}
+                          onOpenEditor={openEditor}
+                        />
                       {/if}
                     </Stack>
                   {/if}

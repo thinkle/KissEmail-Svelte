@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { Template } from "./../../../node_modules/svelte/src/compiler/phases/3-transform/client/transform-template/template.js";
   import {
     Bar,
     Button,
@@ -11,10 +12,12 @@
     Option,
     Select,
     Stack,
+    Toggle,
   } from "contain-css-svelte";
   import EmailFrame from "./EmailFrame.svelte";
   import TemplateWarnings from "./TemplateWarnings.svelte";
-  import type { TemplateWarningReport } from "../lib/mailMerge";
+  import { renderPreview, type TemplateWarningReport } from "../lib/mailMerge";
+  import type { SerializableCellValue } from "../../shared/mailMerge";
   import {
     FONT_OPTIONS,
     FONT_SIZE_OPTIONS,
@@ -26,7 +29,14 @@
     headers = [],
     templateHtml = $bindable(""),
     previewHtml = "",
-    warningReport = { missingFields: [], suspiciousPlaceholders: [], notices: [] },
+    previewRows = [],
+    previewRowNumbers = [],
+    showOpenEditorButton = true,
+    warningReport = {
+      missingFields: [],
+      suspiciousPlaceholders: [],
+      notices: [],
+    },
     mode = "sidebar",
     onOpenEditor,
     onSaveTemplate,
@@ -34,6 +44,9 @@
     headers?: string[];
     templateHtml?: string;
     previewHtml?: string;
+    previewRows?: SerializableCellValue[][];
+    previewRowNumbers?: number[];
+    showOpenEditorButton?: boolean;
     warningReport?: TemplateWarningReport;
     mode?: "sidebar" | "editor";
     onOpenEditor?: () => void;
@@ -51,6 +64,7 @@
   let showLinkTools = $state(false);
   let linkUrl = $state("");
   let linkText = $state("");
+  let selectedPreviewRowIndex = $state(0);
   let editorEl = $state<HTMLDivElement | null>(null);
   let sourceEl = $state<HTMLTextAreaElement | null>(null);
   let activeTable = $state<HTMLTableElement | null>(null);
@@ -58,6 +72,24 @@
   let savedRange = $state<Range | null>(null);
 
   const showPreview = $derived(previewOverride ?? mode === "sidebar");
+  const normalizedPreviewRowIndex = $derived(
+    previewRows[selectedPreviewRowIndex] ? selectedPreviewRowIndex : 0,
+  );
+  const previewRowOptions = $derived(
+    previewRows.map((_, index) => ({
+      value: String(index),
+      label: `Row ${previewRowNumbers[index] ?? index + 1}`,
+    })),
+  );
+  const effectivePreviewHtml = $derived(
+    previewRows.length
+      ? renderPreview(
+          templateHtml,
+          headers,
+          previewRows[normalizedPreviewRowIndex] ?? previewRows[0] ?? [],
+        )
+      : previewHtml,
+  );
   const hasActiveTable = $derived(Boolean(activeTable && activeRow));
   const activeRowIsHeading = $derived(
     Boolean(
@@ -668,19 +700,37 @@
 
 <Stack>
   <Bar>
-    <Inline wrap="wrap">
+    <Inline wrap="wrap" --inline-gap="16px">
       {#if mode === "sidebar"}
-        <Button onclick={onOpenEditor}>Edit Template</Button>
-        <Button onclick={() => (previewOverride = !showPreview)}>
-          {showPreview ? "Show Template" : "Show Preview"}
-        </Button>
+        {#if showOpenEditorButton}
+          <Button onclick={onOpenEditor}>Edit Template</Button>
+        {/if}
+        <Toggle bind:checked={previewOverride}>
+          {#snippet onLabel()}
+            Preview
+          {/snippet}
+          {#snippet offLabel()}
+            Template
+          {/snippet}
+        </Toggle>
       {:else}
-        <Button onclick={() => (previewOverride = !showPreview)}>
-          {showPreview ? "Show Editor" : "Show Preview"}
-        </Button>
+        <Toggle bind:checked={previewOverride}>
+          {#snippet onLabel()}
+            Preview
+          {/snippet}
+          {#snippet offLabel()}
+            Editor
+          {/snippet}
+        </Toggle>
         {#if !showPreview}
-          <Button onclick={toggleSource} primary={showSource}>HTML</Button>
-          <Button onclick={toggleSource} primary={!showSource}>WYSIWYG</Button>
+          <Toggle bind:checked={showSource}>
+            {#snippet onLabel()}
+              HTML
+            {/snippet}
+            {#snippet offLabel()}
+              WYSIWYG
+            {/snippet}
+          </Toggle>
         {/if}
       {/if}
     </Inline>
@@ -989,7 +1039,24 @@
   {/if}
   <TemplateWarnings report={warningReport} />
   {#if showPreview}
-    <div class="email-preview"><EmailFrame html={previewHtml} /></div>
+    {#if previewRowOptions.length > 1}
+      <Bar>
+        <Inline align="center">
+          <span>Preview Row</span>
+          <Select
+            value={String(normalizedPreviewRowIndex)}
+            onchange={(event) =>
+              (selectedPreviewRowIndex =
+                Number((event.currentTarget as HTMLSelectElement).value) || 0)}
+          >
+            {#each previewRowOptions as option}
+              <Option value={option.value}>{option.label}</Option>
+            {/each}
+          </Select>
+        </Inline>
+      </Bar>
+    {/if}
+    <div class="email-preview"><EmailFrame html={effectivePreviewHtml} /></div>
   {:else if showSource}
     <textarea class="source-view" bind:this={sourceEl} bind:value={templateHtml}
     ></textarea>
@@ -1046,6 +1113,16 @@
     max-width: none;
     margin-left: 0;
     margin-right: 0;
+  }
+
+  .editor :global(a) {
+    color: -webkit-link;
+    text-decoration: underline;
+  }
+
+  .editor :global(a:hover),
+  .editor :global(a:focus-visible) {
+    color: -webkit-link;
   }
 
   .source-view {

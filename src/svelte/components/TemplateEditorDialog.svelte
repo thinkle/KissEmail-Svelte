@@ -177,6 +177,11 @@
         headers={editorState.headers}
         bind:templateHtml={editorState.templateHtml}
         {previewHtml}
+        previewRows={editorState.sampleRows}
+        previewRowNumbers={rawRows.rowNumbers.slice(
+          Math.max(editorState.headerRows - 1, 0),
+          Math.max(editorState.headerRows - 1, 0) + editorState.sampleRows.length,
+        )}
         warningReport={warnings}
         onSaveTemplate={saveTemplate}
       />
