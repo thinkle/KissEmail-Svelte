@@ -1,5 +1,4 @@
 <script lang="ts">
-  import { Template } from "./../../../node_modules/svelte/src/compiler/phases/3-transform/client/transform-template/template.js";
   import {
     Bar,
     Button,
@@ -28,6 +27,7 @@
   let {
     headers = [],
     templateHtml = $bindable(""),
+    previewTemplateHtml = "",
     previewHtml = "",
     previewRows = [],
     previewRowNumbers = [],
@@ -43,6 +43,7 @@
   }: {
     headers?: string[];
     templateHtml?: string;
+    previewTemplateHtml?: string;
     previewHtml?: string;
     previewRows?: SerializableCellValue[][];
     previewRowNumbers?: number[];
@@ -88,7 +89,7 @@
   const effectivePreviewHtml = $derived(
     previewRows.length
       ? renderPreview(
-          templateHtml,
+          previewTemplateHtml || templateHtml,
           headers,
           previewRows[normalizedPreviewRowIndex] ?? previewRows[0] ?? [],
         )
@@ -1164,7 +1165,9 @@
       {/if}
     </div>
   {:else}
-    <div class="email-preview"><EmailFrame html={templateHtml} /></div>
+    <div class="email-preview">
+      <EmailFrame html={previewTemplateHtml || templateHtml} />
+    </div>
   {/if}
 
   {#if mode === "sidebar"}

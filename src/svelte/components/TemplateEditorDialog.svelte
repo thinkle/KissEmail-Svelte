@@ -71,7 +71,10 @@
   function hydrateConfig(info: SheetConfigState) {
     editorState.templateHtml = info.config?.template ?? "";
     editorState.headerRows = Math.max(Number(info.config?.headerRows) || 1, 1);
-    editorState.sampleRows = getSampleRowsFromRaw(rawRows, editorState.headerRows);
+    editorState.sampleRows = getSampleRowsFromRaw(
+      rawRows,
+      editorState.headerRows,
+    );
   }
 
   function hydrateHeaders(info: SheetHeaders) {
@@ -85,7 +88,10 @@
 
   function hydrateRawRows(info: SheetRawRows) {
     rawRows = info;
-    editorState.sampleRows = getSampleRowsFromRaw(rawRows, editorState.headerRows);
+    editorState.sampleRows = getSampleRowsFromRaw(
+      rawRows,
+      editorState.headerRows,
+    );
   }
 
   async function loadEditorState() {
@@ -138,7 +144,9 @@
   async function saveTemplate() {
     setBusy("Saving template...");
     try {
-      const info = await GoogleAppsScript.saveMailMergeTemplate(editorState.templateHtml);
+      const info = await GoogleAppsScript.saveMailMergeTemplate(
+        editorState.templateHtml,
+      );
       hydrateShell(info);
       editorState.sampleRows = info.sampleRows ?? editorState.sampleRows;
       ui.errorMessage = "";
@@ -158,34 +166,37 @@
 </script>
 
 <Page>
-  <Container padding="0" --container-margin="0">
+  <Container padding="0" --container-height="100vh">
     <Stack>
-    <BusyOverlay
-      busy={ui.busy || ui.loading}
-      message={ui.loading ? "Loading template and merge fields..." : ui.busyMessage}
-    />
-
-    {#if ui.errorMessage}
-      <Card bg="#fff1f0" fg="#8f2f25">
-        <p>{ui.errorMessage}</p>
-      </Card>
-    {/if}
-
-    {#if !ui.loading}
-      <TemplateEditor
-        mode="editor"
-        headers={editorState.headers}
-        bind:templateHtml={editorState.templateHtml}
-        {previewHtml}
-        previewRows={editorState.sampleRows}
-        previewRowNumbers={rawRows.rowNumbers.slice(
-          Math.max(editorState.headerRows - 1, 0),
-          Math.max(editorState.headerRows - 1, 0) + editorState.sampleRows.length,
-        )}
-        warningReport={warnings}
-        onSaveTemplate={saveTemplate}
+      <BusyOverlay
+        busy={ui.busy || ui.loading}
+        message={ui.loading
+          ? "Loading template and merge fields..."
+          : ui.busyMessage}
       />
-    {/if}
+
+      {#if ui.errorMessage}
+        <Card bg="#fff1f0" fg="#8f2f25">
+          <p>{ui.errorMessage}</p>
+        </Card>
+      {/if}
+
+      {#if !ui.loading}
+        <TemplateEditor
+          mode="editor"
+          headers={editorState.headers}
+          bind:templateHtml={editorState.templateHtml}
+          {previewHtml}
+          previewRows={editorState.sampleRows}
+          previewRowNumbers={rawRows.rowNumbers.slice(
+            Math.max(editorState.headerRows - 1, 0),
+            Math.max(editorState.headerRows - 1, 0) +
+              editorState.sampleRows.length,
+          )}
+          warningReport={warnings}
+          onSaveTemplate={saveTemplate}
+        />
+      {/if}
     </Stack>
   </Container>
 </Page>

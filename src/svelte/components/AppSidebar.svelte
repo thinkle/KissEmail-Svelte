@@ -36,7 +36,7 @@
   import BusyOverlay from "./BusyOverlay.svelte";
   import AboutKiss from "./AboutKiss.svelte";
   import ConfigPanel from "./ConfigPanel.svelte";
-import FooterBar from "./FooterBar.svelte";
+  import FooterBar from "./FooterBar.svelte";
   import ReceiptPanel from "./ReceiptPanel.svelte";
   import TemplateEditor from "./TemplateEditor.svelte";
   import TemplateWarnings from "./TemplateWarnings.svelte";
@@ -386,6 +386,8 @@ import FooterBar from "./FooterBar.svelte";
       draftState.templateHtml = "";
       draftState.warnings = [];
       draftState.previewInlineImages = {};
+      draftState.error = "";
+      draftState.loadingTemplate = false;
       return;
     }
 
@@ -408,6 +410,14 @@ import FooterBar from "./FooterBar.svelte";
         draftState.loadingTemplate = false;
       }
     }
+  }
+
+  function beginDraftTemplateLoad() {
+    draftState.loadingTemplate = true;
+    draftState.templateHtml = "";
+    draftState.warnings = [];
+    draftState.previewInlineImages = {};
+    draftState.error = "";
   }
 
   async function persistContentSource() {
@@ -443,14 +453,29 @@ import FooterBar from "./FooterBar.svelte";
   }
 
   async function selectDraft(draftId: string) {
+    const token = refreshToken + 1;
+    refreshToken = token;
     config.draftId = draftId;
+    if (draftId) {
+      beginDraftTemplateLoad();
+    } else {
+      draftState.templateHtml = "";
+      draftState.warnings = [];
+      draftState.previewInlineImages = {};
+      draftState.error = "";
+      draftState.loadingTemplate = false;
+    }
+    const loadPromise = loadDraftTemplate(draftId, token);
     await persistContentSource();
-    await loadDraftTemplate(draftId);
+    await loadPromise;
   }
 
   async function reloadDraft() {
     const token = refreshToken + 1;
     refreshToken = token;
+    if (config.draftId) {
+      beginDraftTemplateLoad();
+    }
     const jobs: Promise<void>[] = [loadRecentDrafts(token)];
     if (config.draftId) {
       jobs.push(loadDraftTemplate(config.draftId, token));
@@ -739,7 +764,7 @@ import FooterBar from "./FooterBar.svelte";
             width="32"
             height="32"
           />
-          <h1 style="margin:0;font-size:1.2rem;">
+          <h1 style="margin:0;font-size:1.2rem; color: var(--brand-fg);">
             <Tooltip tooltipText="Keep it simple, stupid :-)"
               ><span style="inline-block">KISS</span></Tooltip
             >
@@ -826,18 +851,15 @@ import FooterBar from "./FooterBar.svelte";
               </TabItem>
               <TabItem
                 active={config.contentSource === "draft"}
-                disabled={
-                  capabilitiesLoaded && !capabilities.gmailDrafts.available
-                }
+                disabled={capabilitiesLoaded &&
+                  !capabilities.gmailDrafts.available}
                 onclick={() => void selectContentSource("draft")}
               >
                 Use Gmail Draft
               </TabItem>
             </TabBar>
 
-            {#if config.contentSource === "draft" &&
-              capabilitiesLoaded &&
-              !capabilities.gmailDrafts.available}
+            {#if config.contentSource === "draft" && capabilitiesLoaded && !capabilities.gmailDrafts.available}
               <Card bg="var(--warning-bg)" fg="var(--warning-fg)">
                 <p>
                   Draft mode is not available without full Gmail permissions.
@@ -861,11 +883,13 @@ import FooterBar from "./FooterBar.svelte";
                 mode="sidebar"
                 headers={sheetData.headers}
                 bind:templateHtml={config.template}
+                previewTemplateHtml={config.template}
                 {previewHtml}
                 previewRows={sheetData.sampleRows}
                 previewRowNumbers={rawRows.rowNumbers.slice(
                   Math.max(config.headerRows - 1, 0),
-                  Math.max(config.headerRows - 1, 0) + sheetData.sampleRows.length,
+                  Math.max(config.headerRows - 1, 0) +
+                    sheetData.sampleRows.length,
                 )}
                 warningReport={templateWarnings}
                 onOpenEditor={openEditor}
@@ -900,10 +924,8 @@ import FooterBar from "./FooterBar.svelte";
                       <Tooltip tooltipText="Reload drafts from Gmail">
                         <MiniButton
                           onclick={() => void reloadDraft()}
-                          disabled={
-                            draftState.loadingList ||
-                            draftState.loadingTemplate
-                          }
+                          disabled={draftState.loadingList ||
+                            draftState.loadingTemplate}
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -929,17 +951,21 @@ import FooterBar from "./FooterBar.svelte";
                   {#if config.draftId}
                     <Stack>
                       {#if draftState.loadingTemplate}
-                        <p>Loading draft preview...</p>
+                        <div class="draft-preview-loading">
+                          <p>Loading draft preview...</p>
+                        </div>
                       {:else}
                         <TemplateEditor
                           mode="sidebar"
                           headers={sheetData.headers}
                           templateHtml={draftState.templateHtml}
+                          previewTemplateHtml={activeTemplateHtml}
                           {previewHtml}
                           previewRows={sheetData.sampleRows}
                           previewRowNumbers={rawRows.rowNumbers.slice(
                             Math.max(config.headerRows - 1, 0),
-                            Math.max(config.headerRows - 1, 0) + sheetData.sampleRows.length,
+                            Math.max(config.headerRows - 1, 0) +
+                              sheetData.sampleRows.length,
                           )}
                           showOpenEditorButton={false}
                           warningReport={draftWarnings}
@@ -977,13 +1003,35 @@ import FooterBar from "./FooterBar.svelte";
       />
 
       <FooterBar {ready} merging={ui.merging} onMerge={doMerge} />
-
-      <Stack>
+      <div class="spacer" style="height: 48px%;"></div>
+      <div
+        style="position: fixed; bottom: 0; width: 100%; padding: 4px; text-align: center; font-size: 10px; color: var(--fg-muted); box-sizing: border-box;
+        overflow: hidden; background: var(--surface-bg); color: var(--surface-fg); height: 48px;"
+      >
         {#if sheetData.quota}
           You can send {sheetData.quota} more emails today.
         {/if}
         <p>KISS Mail Merge for Google Sheets.</p>
-      </Stack>
+      </div>
     </Stack>
   {/if}
 </Container>
+
+<style>
+  .draft-preview-loading {
+    min-height: 320px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 14px;
+    border: 1px solid rgba(23, 48, 74, 0.14);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--fg-muted, #666);
+    box-sizing: border-box;
+  }
+
+  .draft-preview-loading p {
+    margin: 0;
+  }
+</style>
