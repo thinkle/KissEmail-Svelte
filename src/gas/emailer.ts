@@ -13,7 +13,7 @@ export function sendEmail(
   email: string,
   subject: string,
   htmlBody: string,
-  options?: { cc?: string; bcc?: string } & EmailSendAssets
+  options?: { cc?: string; bcc?: string } & EmailSendAssets,
 ) {
   const params: GoogleAppsScript.Mail.MailAdvancedParameters & {
     to: string;
@@ -44,7 +44,7 @@ export function sendEmail(
 export function applyTemplate(
   template: string,
   fields: Record<string, unknown>,
-  fixWhiteSpace = false
+  fixWhiteSpace = false,
 ): string {
   let output = template ?? "";
   if (fixWhiteSpace) {
@@ -58,7 +58,7 @@ export function applyTemplate(
     }
     output = output.replace(
       new RegExp(escapeRegExp(`{{${target}}}`), "g"),
-      replacement
+      replacement,
     );
   }
 
@@ -85,7 +85,7 @@ export function sendEmailFromTemplate(
   fixWhiteSpace = false,
   ccTemplate = "",
   bccTemplate = "",
-  assets?: EmailSendAssets
+  assets?: EmailSendAssets,
 ) {
   const to = applyTemplate(emailTemplate, fields);
   const subject = applyTemplate(subjectTemplate, fields);

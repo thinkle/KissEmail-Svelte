@@ -100,12 +100,13 @@ export function loadRecentDrafts(limit = 20): GmailDraftSummary[] {
 export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
   const isFollowup = draftId === "draft-followup";
   const body = isFollowup
-    ? "<p>Hi {{PreferredName}},</p><p>Your advisor {AdvisorName} asked us to check in.</p><p>Reference: &lt;&lt;CaseManager&gt;&gt;</p><p><img src=\"cid:followup-inline-image\" alt=\"Inline image\"></p>"
-    : "<p>Dear {{FirstName}},</p><p>Welcome to our program.</p><p><img src=\"https://example.com/logo.png\" alt=\"Logo\"></p>";
+    ? '<p>Hi {{PreferredName}},</p><p>Your advisor {AdvisorName} asked us to check in.</p><p>Reference: &lt;&lt;CaseManager&gt;&gt;</p><p><img src="cid:followup-inline-image" alt="Inline image"></p>'
+    : '<p>Dear {{FirstName}},</p><p>Welcome to our program.</p><p><img src="https://example.com/logo.png" alt="Logo"></p>';
   return structuredClone({
     id: draftId,
     subject:
-      mockDrafts.find((draft) => draft.id === draftId)?.subject ?? "(No subject)",
+      mockDrafts.find((draft) => draft.id === draftId)?.subject ??
+      "(No subject)",
     htmlBody: body,
     warnings: isFollowup
       ? [
@@ -122,11 +123,18 @@ export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
 }
 
 export function loadRawRows(limit = 60): SheetRawRows {
-  const headerRows = Math.max(Number(state.sheetInfo.config.headerRows) || 1, 1);
-  const extraHeaderRows = Array.from({ length: Math.max(headerRows - 1, 0) }, () =>
-    state.sheetInfo.headers.map(() => ""),
+  const headerRows = Math.max(
+    Number(state.sheetInfo.config.headerRows) || 1,
+    1,
   );
-  const rows = [...extraHeaderRows, ...state.sheetInfo.sampleRows].slice(0, limit);
+  const extraHeaderRows = Array.from(
+    { length: Math.max(headerRows - 1, 0) },
+    () => state.sheetInfo.headers.map(() => ""),
+  );
+  const rows = [...extraHeaderRows, ...state.sheetInfo.sampleRows].slice(
+    0,
+    limit,
+  );
   return structuredClone({
     rowNumbers: rows.map((_, index) => index + 2),
     rows,
@@ -173,7 +181,6 @@ export function openEditorDialog(): void {
   openMockDialog();
 }
 
-
 export function checkEmailReceipts(_sheetName?: string): CheckReceiptsResult {
   updateMockStateAfterReceiptCheck(state);
   return structuredClone(state.checkReceiptsResult);
@@ -197,7 +204,9 @@ export function debugReceiptTracking(receiptId: string): ReceiptDebugResult {
   };
 }
 
-export function enableHourlyReceiptChecks(_sheetName?: string): MailMergeConfig {
+export function enableHourlyReceiptChecks(
+  _sheetName?: string,
+): MailMergeConfig {
   updateMockStateForSavedConfig(state, {
     trackReceipt: true,
     autoCheckReceipts: true,

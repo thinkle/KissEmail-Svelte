@@ -1,8 +1,10 @@
 import type { SheetConfigState, SheetShell } from "../shared/mailMerge";
 import type { AddOnContext } from "./lib/parseContext";
 
+export type AppView = "about" | "editor" | "templateEditor";
+
 export type AppContext = AddOnContext & {
-  view?: "sidebar" | "editor";
+  view: AppView;
   initialSheetConfig?: SheetConfigState;
   initialSheetShell?: SheetShell;
 };
@@ -10,18 +12,27 @@ export type AppContext = AddOnContext & {
 export const DEFAULT_CONTEXT: AppContext = {
   addOn: "Sheets",
   container: "sidebar",
-  view: "sidebar",
+  view: "editor",
   //mode: "modal",
   localTesting: true,
 };
 
+function normalizeView(view: unknown): AppView {
+  if (view === "about" || view === "editor" || view === "templateEditor") {
+    return view;
+  }
+  return "editor";
+}
+
 function normalizeContext(context: Partial<AppContext>): AppContext {
-  const container = context.container === "dialog" ? "dialog" : "sidebar";
+  const view = normalizeView(context.view);
+  const container = view === "editor" ? "sidebar" : "dialog";
+
   return {
     ...DEFAULT_CONTEXT,
     ...context,
     container,
-    view: container === "dialog" ? "editor" : "sidebar",
+    view,
   };
 }
 
@@ -31,11 +42,15 @@ function getUrlContext(): Partial<AppContext> {
   }
 
   const view = new URL(window.location.href).searchParams.get("view");
-  if (view === "editor") {
-    return { container: "dialog", view: "editor", localTesting: true };
-  }
+  // Backward compatibility for older links/query params.
   if (view === "sidebar") {
-    return { container: "sidebar", view: "sidebar", localTesting: true };
+    return { container: "sidebar", view: "editor", localTesting: true };
+  }
+  if (view === "editor") {
+    return { container: "dialog", view: "templateEditor", localTesting: true };
+  }
+  if (view === "about" || view === "templateEditor") {
+    return { container: "dialog", view, localTesting: true };
   }
   return {};
 }

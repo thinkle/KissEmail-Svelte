@@ -68,10 +68,14 @@ function escapeRegex(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Placeholder syntax is exact-match by delimiter only:
+// whatever appears between '{{' and the first following '}}' is the field name.
+const PLACEHOLDER_REGEX = /\{\{([\s\S]*?)\}\}/g;
+
 export function buildMergeFormula(
   mergeCondition: MergeCondition,
   headers: string[],
-  headerRows: number
+  headerRows: number,
 ): string {
   if (mergeCondition.doCustomFormula) {
     return mergeCondition.customFormula.trim();
@@ -90,15 +94,15 @@ export function buildMergeFormula(
       return `=LEN(TRIM(TO_TEXT(${cellReference})))>0`;
     case "EQUALS":
       return `=${cellReference}=${quoteFormulaValue(
-        mergeCondition.specialConditionText
+        mergeCondition.specialConditionText,
       )}`;
     case "NOT_EQUALS":
       return `=${cellReference}<>${quoteFormulaValue(
-        mergeCondition.specialConditionText
+        mergeCondition.specialConditionText,
       )}`;
     case "CONTAINS":
       return `=REGEXMATCH(TO_TEXT(${cellReference}),"${escapeRegex(
-        mergeCondition.specialConditionText
+        mergeCondition.specialConditionText,
       )}")`;
     default:
       return "";
@@ -107,7 +111,7 @@ export function buildMergeFormula(
 
 export function mergeConditionFromConfig(
   headers: string[],
-  config: MailMergeConfig
+  config: MailMergeConfig,
 ): MergeCondition {
   const base = defaultMergeCondition(headers);
   if (config.useMergeIf && config.mergeFormula) {
@@ -123,14 +127,14 @@ export function mergeConditionFromConfig(
 export function renderPreview(
   html: string,
   headers: string[],
-  sampleRow: SerializableCellValue[]
+  sampleRow: SerializableCellValue[],
 ): string {
   const rowObject = Object.fromEntries(
-    headers.map((header, index) => [header, sampleRow[index] ?? ""])
+    headers.map((header, index) => [header, sampleRow[index] ?? ""]),
   );
 
-  return html.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (match, key) => {
-    const value = rowObject[key];
+  return html.replace(PLACEHOLDER_REGEX, (match, key) => {
+    const value = rowObject[String(key)];
     return value === null || value === undefined ? match : String(value);
   });
 }
@@ -154,9 +158,7 @@ export function rewriteCidImagesForPreview(
 
 export function extractTemplateFields(html: string): string[] {
   return Array.from(
-    new Set(
-      Array.from(html.matchAll(/\{\{\s*([\w.]+)\s*\}\}/g), (match) => match[1]),
-    ),
+    new Set(Array.from(html.matchAll(PLACEHOLDER_REGEX), (match) => match[1])),
   );
 }
 
@@ -182,7 +184,9 @@ function extractSuspiciousPlaceholders(html: string): Array<{
         ),
       ),
     ),
-  ).map((value) => JSON.parse(value) as { found: string; suggestedField: string });
+  ).map(
+    (value) => JSON.parse(value) as { found: string; suggestedField: string },
+  );
 }
 
 export function getTemplateWarningReport(
@@ -202,7 +206,7 @@ export function getTemplateWarningReport(
 export function getSampleRowsFromRaw(
   rawRows: SheetRawRows,
   headerRows: number,
-  count = 3
+  count = 3,
 ): SerializableCellValue[][] {
   const skipRows = Math.max(Number(headerRows) || 1, 1) - 1;
   return rawRows.rows.slice(skipRows, skipRows + count);
@@ -213,7 +217,7 @@ export function getTestRowsFromRaw(
   rawRows: SheetRawRows,
   headerRows: number,
   toTemplate: string,
-  limit = 50
+  limit = 50,
 ): TestRow[] {
   if (!toTemplate.trim()) {
     return [];
@@ -236,8 +240,8 @@ export function configIsReady(config: MailMergeConfig): boolean {
       : Boolean(config.template.trim());
   return Boolean(
     hasContent &&
-      config.to.trim() &&
-      config.subject.trim() &&
-      (!config.useMergeIf || config.mergeFormula.trim())
+    config.to.trim() &&
+    config.subject.trim() &&
+    (!config.useMergeIf || config.mergeFormula.trim()),
   );
 }

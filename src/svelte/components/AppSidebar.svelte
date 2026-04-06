@@ -26,6 +26,7 @@
     ReceiptSummary,
     SaveMailMergeConfigInput,
     SheetConfigState,
+    SheetShell,
     SheetHeaders,
     SheetRawRows,
     SheetSampleRows,
@@ -41,6 +42,8 @@
   import TemplateEditor from "./TemplateEditor.svelte";
   import TemplateWarnings from "./TemplateWarnings.svelte";
   import TestPanel from "./TestPanel.svelte";
+  import { BUILD_INFO } from "../lib/buildInfo";
+  import { VERSION_INFO } from "../lib/versionInfo";
   import {
     SPECIAL_CONDITIONS,
     buildMergeFormula,
@@ -611,10 +614,23 @@
   }
 
   async function doMerge() {
-    setBusy("Sending mail merge...");
+    setBusy(
+      "Sending mail merge... This can take a while if you have a lot of emails to send, but don't worry, you can close this sidebar and the merge will continue in the background! If the merge times out before it's done, just come back to the sidebar and click 'Do Merge' again to resume where it left off.",
+    );
     ui.merging = true;
     try {
       const result = await GoogleAppsScript.runMailMerge(sheetData.sheet);
+      if (result.cancelled) {
+        test.status = "Mail merge cancelled.";
+        ui.errorMessage = "";
+        return;
+      }
+
+      if (!result.successful && !result.errors) {
+        test.status = "No pending emails to send.";
+        ui.errorMessage = "";
+        return;
+      }
       test.status = `Sent ${result.successful} email${
         result.successful === 1 ? "" : "s"
       }${result.errors ? `, ${result.errors} error${result.errors === 1 ? "" : "s"}` : ""}.`;
@@ -1003,15 +1019,23 @@
       />
 
       <FooterBar {ready} merging={ui.merging} onMerge={doMerge} />
-      <div class="spacer" style="height: 48px%;"></div>
+      <div class="spacer" style="height: 70px;"></div>
       <div
-        style="position: fixed; bottom: 0; width: 100%; padding: 4px; text-align: center; font-size: 10px; color: var(--fg-muted); box-sizing: border-box;
-        overflow: hidden; background: var(--surface-bg); color: var(--surface-fg); height: 48px;"
+        style="position: fixed; bottom: 0; width: 100%; 
+        padding: 4px; text-align: center; 
+        font-size: 10px; color: var(--fg-muted); box-sizing: border-box;
+        overflow: hidden; 
+        background: var(--surface-bg); 
+        color: var(--surface-fg); 
+        max-height: 70px;
+        "
       >
         {#if sheetData.quota}
-          You can send {sheetData.quota} more emails today.
+          You can send <b>{sheetData.quota}</b> more emails today.
         {/if}
-        <p>KISS Mail Merge for Google Sheets.</p>
+        <br />
+        Version {VERSION_INFO.currentVersion} • Latest update:
+        {BUILD_INFO.builtAtDisplay}
       </div>
     </Stack>
   {/if}

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Button, Card, Inline, Tag } from "contain-css-svelte";
+  import { Button, Card, Inline } from "contain-css-svelte";
 
   let {
     ready = false,

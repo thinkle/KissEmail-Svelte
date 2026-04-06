@@ -126,4 +126,6 @@ export interface SendTestEmailResult {
 export interface MailMergeResult {
   successful: number;
   errors: number;
+  cancelled?: boolean;
+  pendingCount?: number;
 }

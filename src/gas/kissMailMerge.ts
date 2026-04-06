@@ -23,12 +23,16 @@ import {
   type EmailSendAssets,
 } from "./emailer";
 import {
+  buildMailMergePlan,
   checkEmailReceipts,
   debugReceiptStatus,
   doMailMerge,
   summarizeReceiptTracking,
 } from "./mailMerge";
-import { getAutoReceiptStatus, syncAutoReceiptMonitoring } from "./receiptScheduler";
+import {
+  getAutoReceiptStatus,
+  syncAutoReceiptMonitoring,
+} from "./receiptScheduler";
 import { Table } from "./tableReader";
 import { TRACKING_URL } from "./trackingConfig";
 import { cleanupObject, withTiming } from "./utils";
@@ -73,26 +77,45 @@ function getDefaultConfig(sheetName: string): MailMergeConfig {
   };
 }
 
-function toMailMergeConfig(sheetName: string, rawConfig: Record<string, unknown>): MailMergeConfig {
+function toMailMergeConfig(
+  sheetName: string,
+  rawConfig: Record<string, unknown>,
+): MailMergeConfig {
   const defaults = getDefaultConfig(sheetName);
   return {
     jobName:
       typeof rawConfig.jobName === "string" && rawConfig.jobName
         ? rawConfig.jobName
         : defaults.jobName,
-    headerRows: Math.max(Number(rawConfig.headerRows) || defaults.headerRows, 1),
+    headerRows: Math.max(
+      Number(rawConfig.headerRows) || defaults.headerRows,
+      1,
+    ),
     to: typeof rawConfig.to === "string" ? rawConfig.to : defaults.to,
     cc: typeof rawConfig.cc === "string" ? rawConfig.cc : defaults.cc,
     bcc: typeof rawConfig.bcc === "string" ? rawConfig.bcc : defaults.bcc,
-    subject: typeof rawConfig.subject === "string" ? rawConfig.subject : defaults.subject,
-    template: typeof rawConfig.template === "string" ? rawConfig.template : defaults.template,
+    subject:
+      typeof rawConfig.subject === "string"
+        ? rawConfig.subject
+        : defaults.subject,
+    template:
+      typeof rawConfig.template === "string"
+        ? rawConfig.template
+        : defaults.template,
     useMergeIf: Boolean(rawConfig.useMergeIf),
     mergeFormula:
-      typeof rawConfig.mergeFormula === "string" ? rawConfig.mergeFormula : defaults.mergeFormula,
+      typeof rawConfig.mergeFormula === "string"
+        ? rawConfig.mergeFormula
+        : defaults.mergeFormula,
     trackReceipt: Boolean(rawConfig.trackReceipt),
-    autoCheckReceipts: Boolean(rawConfig.trackReceipt && rawConfig.autoCheckReceipts),
+    autoCheckReceipts: Boolean(
+      rawConfig.trackReceipt && rawConfig.autoCheckReceipts,
+    ),
     contentSource: rawConfig.contentSource === "draft" ? "draft" : "template",
-    draftId: typeof rawConfig.draftId === "string" ? rawConfig.draftId : defaults.draftId,
+    draftId:
+      typeof rawConfig.draftId === "string"
+        ? rawConfig.draftId
+        : defaults.draftId,
   };
 }
 
@@ -102,11 +125,16 @@ function getColumnHeaders(): string[] {
 }
 
 function getColumnHeadersForSheet(
-  sheet: GoogleAppsScript.Spreadsheet.Sheet
+  sheet: GoogleAppsScript.Spreadsheet.Sheet,
 ): string[] {
   const dataRange = sheet.getDataRange();
   return sheet
-    .getRange(dataRange.getRow(), dataRange.getColumn(), 1, dataRange.getNumColumns())
+    .getRange(
+      dataRange.getRow(),
+      dataRange.getColumn(),
+      1,
+      dataRange.getNumColumns(),
+    )
     .getValues()[0]
     .map((header) => String(header ?? ""));
 }
@@ -118,7 +146,7 @@ function getSampleRows(headerRows: number): unknown[][] {
 
 function getSampleRowsForSheet(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  headerRows: number
+  headerRows: number,
 ): unknown[][] {
   const dataRange = sheet.getDataRange();
   const startRow = dataRange.getRow() + headerRows;
@@ -129,7 +157,12 @@ function getSampleRowsForSheet(
   const rowCount = Math.min(availableRows, 3);
   return dataRange
     .getSheet()
-    .getRange(startRow, dataRange.getColumn(), rowCount, dataRange.getNumColumns())
+    .getRange(
+      startRow,
+      dataRange.getColumn(),
+      rowCount,
+      dataRange.getNumColumns(),
+    )
     .getValues();
 }
 
@@ -139,7 +172,7 @@ function getConfigSheetName(sheet: GoogleAppsScript.Spreadsheet.Sheet): string {
 
 export function setupMergeConfig(
   sheet: GoogleAppsScript.Spreadsheet.Sheet,
-  template?: string
+  template?: string,
 ) {
   const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
   let configSheet = spreadsheet.getSheetByName(getConfigSheetName(sheet));
@@ -167,7 +200,10 @@ export function setupMergeConfig(
 export function getMergeSettings() {
   const sheet = getDataSheet();
   const configurationSheet = setupMergeConfig(sheet);
-  configurationSheet.table = toMailMergeConfig(sheet.getName(), configurationSheet.table);
+  configurationSheet.table = toMailMergeConfig(
+    sheet.getName(),
+    configurationSheet.table,
+  );
   return configurationSheet;
 }
 
@@ -216,7 +252,10 @@ export function getSheetSampleRows(): SheetSampleRows {
     const config = getMergeSettings().table as MailMergeConfig;
     return {
       sampleRows: cleanupObject(
-        getSampleRowsForSheet(sheet, Math.max(Number(config.headerRows) || 1, 1))
+        getSampleRowsForSheet(
+          sheet,
+          Math.max(Number(config.headerRows) || 1, 1),
+        ),
       ) as SheetSampleRows["sampleRows"],
     };
   });
@@ -241,7 +280,10 @@ export function getRawRows(limit = 60): SheetRawRows {
       .getDisplayValues();
 
     return cleanupObject({
-      rowNumbers: Array.from({ length: rowCount }, (_, index) => rowOffset + 1 + index),
+      rowNumbers: Array.from(
+        { length: rowCount },
+        (_, index) => rowOffset + 1 + index,
+      ),
       rows: values,
     }) as SheetRawRows;
   });
@@ -259,7 +301,9 @@ export function getSidebarStatus(): SidebarStatus {
   });
 }
 
-export function saveConfig(settings: Partial<SaveMailMergeConfigInput>): MailMergeConfig {
+export function saveConfig(
+  settings: Partial<SaveMailMergeConfigInput>,
+): MailMergeConfig {
   const configSheet = getMergeSettings();
   const sheet = getDataSheet();
   configSheet.table = {
@@ -402,7 +446,10 @@ export function getDraftTemplate(draftId: string): GmailDraftTemplate {
       subject: message.getSubject() || "",
       htmlBody,
       warnings: getDraftWarnings(htmlBody),
-      previewInlineImages: buildDraftPreviewInlineImages(rawContent, inlineBlobs),
+      previewInlineImages: buildDraftPreviewInlineImages(
+        rawContent,
+        inlineBlobs,
+      ),
     };
   });
 }
@@ -506,7 +553,7 @@ export function getTestRows(limit = 50): TestRow[] {
       rowOffset,
       dataRange.getColumn(),
       maxRows,
-      dataRange.getNumColumns()
+      dataRange.getNumColumns(),
     );
     const table = Table(range);
     const rows: TestRow[] = [];
@@ -526,7 +573,10 @@ export function getTestRows(limit = 50): TestRow[] {
   });
 }
 
-export function sendTestEmail(rowNumber: number, testAddress: string): SendTestEmailResult {
+export function sendTestEmail(
+  rowNumber: number,
+  testAddress: string,
+): SendTestEmailResult {
   if (!testAddress) {
     throw new Error("Please provide a test email address.");
   }
@@ -535,7 +585,9 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
   const draftSource = getBodySource(config);
   const bodyTemplate = draftSource.htmlBody;
   if (!bodyTemplate || !config.subject) {
-    throw new Error("Missing template or subject. Please save your configuration and template first.");
+    throw new Error(
+      "Missing template or subject. Please save your configuration and template first.",
+    );
   }
 
   const sheet = getDataSheet();
@@ -555,12 +607,20 @@ export function sendTestEmail(rowNumber: number, testAddress: string): SendTestE
     .getRange(rowOffset, dataRange.getColumn(), 1, dataRange.getNumColumns())
     .getDisplayValues()[0];
   const rowValues = sheet
-    .getRange(Number(rowNumber), dataRange.getColumn(), 1, dataRange.getNumColumns())
+    .getRange(
+      Number(rowNumber),
+      dataRange.getColumn(),
+      1,
+      dataRange.getNumColumns(),
+    )
     .getDisplayValues()[0];
 
   const rowObject: Record<string, unknown> = {};
   headers.forEach((header, index) => {
-    if (header && !Object.prototype.hasOwnProperty.call(rowObject, String(header))) {
+    if (
+      header &&
+      !Object.prototype.hasOwnProperty.call(rowObject, String(header))
+    ) {
       rowObject[String(header)] = rowValues[index];
     }
   });
@@ -588,17 +648,67 @@ export function doMerge(sheetName?: string): MailMergeResult {
     throw new Error(`Unable to find sheet ${sheetName}`);
   }
 
-  const config = toMailMergeConfig(sheet.getName(), getMergeSettings().table as Record<string, unknown>);
+  const config = toMailMergeConfig(
+    sheet.getName(),
+    getMergeSettings().table as Record<string, unknown>,
+  );
   const draftSource = getBodySource(config);
   const bodyTemplate = draftSource.htmlBody;
   if (!bodyTemplate || !config.to || !config.subject) {
-    throw new Error("Missing template, recipient, or subject. Open the sidebar and save configuration first.");
+    throw new Error(
+      "Missing template, recipient, or subject. Open the sidebar and save configuration first.",
+    );
   }
 
-  const result = doMailMerge(sheet, {
+  const mergeConfig = {
     ...config,
     template: bodyTemplate,
-  }, draftSource.assets);
+  };
+  const plan = buildMailMergePlan(sheet, mergeConfig);
+  const pendingCount = plan.pendingRowIndexes.length;
+
+  if (pendingCount <= 0) {
+    spreadsheet.toast("No pending emails to send.", "KISS Mail Merge", 5);
+    return { successful: 0, errors: 0, cancelled: false, pendingCount: 0 };
+  }
+
+  const ui = SpreadsheetApp.getUi();
+  const pendingLabel = `${pendingCount} email${pendingCount === 1 ? "" : "s"}`;
+  const detailLines = [`Send ${pendingLabel} now?`];
+
+  if (plan.skippedCompletedCount > 0) {
+    detailLines.push(`Skipping ${plan.skippedCompletedCount} already sent.`);
+  }
+  if (plan.retryingErrorCount > 0) {
+    detailLines.push(`Retrying ${plan.retryingErrorCount} previously errored.`);
+  }
+  if (plan.skippedByConditionCount > 0) {
+    detailLines.push(
+      `Skipping ${plan.skippedByConditionCount} filtered out by Do Mail Merge.`,
+    );
+  }
+
+  const choice = ui.alert(
+    "KISS Mail Merge",
+    detailLines.join("\n"),
+    ui.ButtonSet.OK_CANCEL,
+  );
+
+  if (choice !== ui.Button.OK) {
+    spreadsheet.toast("Mail merge cancelled.", "KISS Mail Merge", 5);
+    return { successful: 0, errors: 0, cancelled: true, pendingCount };
+  }
+
+  const result = doMailMerge(sheet, mergeConfig, draftSource.assets, plan);
+
+  const sentLabel = `${result.successful} sent`;
+  const errorLabel = `${result.errors} error${result.errors === 1 ? "" : "s"}`;
+  spreadsheet.toast(
+    `Mail merge complete: ${sentLabel}, ${errorLabel}.`,
+    "KISS Mail Merge",
+    8,
+  );
+
   syncAutoReceiptMonitoring(sheet, config);
   return result;
 }
@@ -613,9 +723,14 @@ export function checkReceipts(sheetName?: string): CheckReceiptsResult {
     throw new Error(`Unable to find sheet ${sheetName}`);
   }
 
-  const config = toMailMergeConfig(sheet.getName(), getMergeSettings().table as Record<string, unknown>);
+  const config = toMailMergeConfig(
+    sheet.getName(),
+    getMergeSettings().table as Record<string, unknown>,
+  );
   if (!config.trackReceipt) {
-    throw new Error("Receipt tracking is not enabled. Enable it in the sidebar settings.");
+    throw new Error(
+      "Receipt tracking is not enabled. Enable it in the sidebar settings.",
+    );
   }
 
   return checkEmailReceipts(sheet, TRACKING_URL);

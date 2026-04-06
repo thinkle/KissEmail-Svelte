@@ -1,14 +1,21 @@
 <script lang="ts">
   import { TextLayout } from "contain-css-svelte";
+  import kissEnvelopeSvg from "../lib/kiss-envelope.svg?raw";
+  import { BUILD_INFO } from "../lib/buildInfo";
+  import { VERSION_INFO } from "../lib/versionInfo";
+  const kissEnvelopeSrc = `data:image/svg+xml;utf8,${encodeURIComponent(kissEnvelopeSvg)}`;
   let {
-    onEditTemplate,
+    onEditTemplate = undefined,
   }: {
-    onEditTemplate: () => {};
+    onEditTemplate?: () => void | null;
   } = $props();
 </script>
 
 <TextLayout>
-  <h2>About <span class="brand">KISS Mail Merge</span></h2>
+  <h2>
+    <img src={kissEnvelopeSrc} alt="KISS Mail Merge" width="32" height="32" />
+    <span class="brand">KISS Mail Merge</span>
+  </h2>
   <p>
     KISS (Keep It Simple, Stupid) Mail Merge is meant to keep mail merge as
     <i>simple</i> as possible.
@@ -22,7 +29,13 @@
     </li>
     <li>Add one row per email you want to send.</li>
     <li>
-      <a href="#" onclick={onEditTemplate}>Write a message template</a>,
+      {#if onEditTemplate}
+        <button type="button" class="linklike" onclick={onEditTemplate}>
+          Write a message template
+        </button>,
+      {:else}
+        Write a message template,
+      {/if}
       inserting column data as fields (fields are inserted as column names, like
       this: {"{{"}Email{"}}"}).
     </li>
@@ -54,7 +67,11 @@
     <dt>Only send certain rows</dt>
     <dd>You can use conditional logic to control which rows are sent.</dd>
     <dt>Prefer Editing in Email?</dt>
-    <dd>We support importing a template from your draft folder</dd>
+    <dd>
+      We support importing a template from your draft folder. This allows more
+      advanced functionality like inserting images, attachments, etc., which is
+      not possible with our simple sheets templates.
+    </dd>
   </dl>
 
   <h3>More Complex Needs?</h3>
@@ -74,6 +91,42 @@
     or sheet layout. As long as it understands that the end result is
     spreadsheet columns feeding an HTML email template, you’ll be in good shape.
   </p>
+
+  <h3>Author</h3>
+  <p>
+    KISS Mail Merge is written by <a
+      href="https://www.tomhinkle.net"
+      target="_blank"
+      rel="noopener noreferrer">Tom Hinkle</a
+    >
+    as one of many side projects. I just hate the idea of people paying for something
+    as basic as Google Apps Mail Merge.
+  </p>
+
+  <h3>Version Info</h3>
+  <p>
+    Current version: <strong>{VERSION_INFO.currentVersion}</strong><br />
+    Built: {BUILD_INFO.builtAtDisplay}
+  </p>
+
+  <table class="version-table">
+    <thead>
+      <tr>
+        <th>Version</th>
+        <th>Date</th>
+        <th>Notes</th>
+      </tr>
+    </thead>
+    <tbody>
+      {#each VERSION_INFO.history as entry (entry.version + entry.date)}
+        <tr>
+          <td>{entry.version}</td>
+          <td>{entry.date}</td>
+          <td>{entry.summary}</td>
+        </tr>
+      {/each}
+    </tbody>
+  </table>
 </TextLayout>
 
 <style>
@@ -117,5 +170,34 @@
     display: block;
     margin-top: 0.25rem;
     opacity: 0.7;
+  }
+
+  .linklike {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: var(--primary-bg);
+    text-decoration: underline;
+    cursor: pointer;
+    font: inherit;
+  }
+
+  .version-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 0.5rem;
+    font-size: 0.92rem;
+  }
+
+  .version-table th,
+  .version-table td {
+    padding: 0.55rem 0.65rem;
+    border: 1px solid rgba(0, 0, 0, 0.12);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  .version-table th {
+    background: rgba(0, 0, 0, 0.04);
   }
 </style>

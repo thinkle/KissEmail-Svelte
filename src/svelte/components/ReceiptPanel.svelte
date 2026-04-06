@@ -3,6 +3,7 @@
     Accordion,
     Button,
     Card,
+    Dialog,
     Inline,
     Stack,
     Table,
@@ -37,6 +38,7 @@
   } = $props();
 
   let open = $state(initiallyOpen);
+  let aboutTrackingDialogOpen = $state(false);
   const busy = $derived(Boolean(busyAction));
 
   function formatTimestamp(value?: string): string {
@@ -60,8 +62,15 @@
   <Accordion>
     <details bind:open>
       <summary>Receipt Tracking</summary>
+
       <Stack>
-        <Table>
+        <Button
+          onclick={() => (aboutTrackingDialogOpen = true)}
+          disabled={busy}
+        >
+          About tracking
+        </Button>
+        <Table --table-width="100%">
           <tbody>
             <tr>
               <th scope="row">Tracked emails</th>
@@ -117,6 +126,29 @@
             {busyAction === "checking" ? "Checking..." : "Check Receipts"}
           </Button>
         </Inline>
+
+        <Dialog
+          --dialog-min-width="unset"
+          --dialog-max-width="unset"
+          --dialog-max-height="unset"
+          --dialog-min-height="unset"
+          open={aboutTrackingDialogOpen}
+          onClose={() => (aboutTrackingDialogOpen = false)}
+        >
+          <div style="width: 80%; margin: 0 auto;">
+            <h2>About tracking</h2>
+            <p style="--font-size:0.85em;color:#555;margin:0.5em 0 0;">
+              A tiny invisible image is embedded in each email. When the
+              recipient opens it, their email client loads the image and we
+              record the time. Tracking is not perfect: many clients block
+              remote images (Outlook, Thunderbird, and privacy-focused apps), so
+              opens can go unrecorded. Others, like Apple Mail on iOS 15+,
+              pre-load images automatically, which can log an "open" even if the
+              email was never read. KISS is no less accurate than other tracking
+              tools; we are just transparent about it.
+            </p>
+          </div>
+        </Dialog>
 
         {#if busyAction === "checking"}
           <Tag>Checking receipt status...</Tag>

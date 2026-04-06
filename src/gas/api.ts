@@ -38,7 +38,7 @@ import { withTiming } from "./utils";
 
 export function getActiveUserEmail(): string {
   return withTiming("api.getActiveUserEmail", {}, () =>
-    Session.getActiveUser().getEmail()
+    Session.getActiveUser().getEmail(),
   );
 }
 
@@ -64,7 +64,7 @@ export function loadSheetSampleRows(): SheetSampleRows {
 
 export function loadRawRows(limit?: number): SheetRawRows {
   return withTiming("api.loadRawRows", { limit: limit ?? null }, () =>
-    getRawRows(limit)
+    getRawRows(limit),
   );
 }
 
@@ -74,31 +74,35 @@ export function loadSidebarStatus(): SidebarStatus {
 
 export function loadRecentDrafts(limit?: number): GmailDraftSummary[] {
   return withTiming("api.loadRecentDrafts", { limit: limit ?? null }, () =>
-    listRecentDrafts(limit)
+    listRecentDrafts(limit),
   );
 }
 
 export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
   return withTiming("api.loadDraftTemplate", { draftId }, () =>
-    getDraftTemplate(draftId)
+    getDraftTemplate(draftId),
   );
 }
 
 export function saveMailMergeConfig(
-  settings: Partial<import("../shared/mailMerge").SaveMailMergeConfigInput>
+  settings: Partial<import("../shared/mailMerge").SaveMailMergeConfigInput>,
 ): MailMergeConfig {
   return withTiming("api.saveMailMergeConfig", {}, () => saveConfig(settings));
 }
 
 export function checkEmailReceipts(sheetName?: string): CheckReceiptsResult {
-  return withTiming("api.checkEmailReceipts", { sheetName: sheetName ?? null }, () =>
-    checkReceipts(sheetName)
+  return withTiming(
+    "api.checkEmailReceipts",
+    { sheetName: sheetName ?? null },
+    () => checkReceipts(sheetName),
   );
 }
 
 export function enableHourlyReceiptChecks(sheetName?: string): MailMergeConfig {
-  return withTiming("api.enableHourlyReceiptChecks", { sheetName: sheetName ?? null }, () =>
-    enableAutoReceiptChecks(sheetName)
+  return withTiming(
+    "api.enableHourlyReceiptChecks",
+    { sheetName: sheetName ?? null },
+    () => enableAutoReceiptChecks(sheetName),
   );
 }
 
@@ -107,7 +111,9 @@ export function debugReceiptTracking(receiptId: string) {
 }
 
 export function saveMailMergeTemplate(template: string): SheetInfo {
-  return withTiming("api.saveMailMergeTemplate", {}, () => saveTemplate(template));
+  return withTiming("api.saveMailMergeTemplate", {}, () =>
+    saveTemplate(template),
+  );
 }
 
 export function loadTestRows(): TestRow[] {
@@ -116,16 +122,18 @@ export function loadTestRows(): TestRow[] {
 
 export function sendMailMergeTestEmail(
   rowNumber: number,
-  testAddress: string
+  testAddress: string,
 ): SendTestEmailResult {
-  return withTiming("api.sendMailMergeTestEmail", { rowNumber, testAddress }, () =>
-    sendTestEmail(rowNumber, testAddress)
+  return withTiming(
+    "api.sendMailMergeTestEmail",
+    { rowNumber, testAddress },
+    () => sendTestEmail(rowNumber, testAddress),
   );
 }
 
 export function runMailMerge(sheetName?: string): MailMergeResult {
   return withTiming("api.runMailMerge", { sheetName: sheetName ?? null }, () =>
-    doMerge(sheetName)
+    doMerge(sheetName),
   );
 }
 

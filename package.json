@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently \"npm run watch:all\" \"vite --open mock/mock.html\"",
+    "build-info": "node scripts/generate-build-info.mjs",
     "build-svelte": "vite build",
     "build-gas": "vite build --config vite.config.gas.ts",
     "build-manifest": "cp ./appsscript.json ./dist/appsscript.json",
-    "build": "npm-run-all build:all build-svelte build-gas build-manifest",
+    "build": "npm-run-all build:all build-info build-svelte build-gas build-manifest",
     "upload": "npm run build && npx clasp push",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.json",
