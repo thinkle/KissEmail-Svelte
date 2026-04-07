@@ -53,7 +53,7 @@
         <Input type="email" bind:value={testAddress} />
       </FormItem>
 
-      <p>Uses saved configuration and template. CC/BCC are ignored.</p>
+      <p>Uses saved configuration and the selected template or Gmail draft. CC/BCC are ignored.</p>
 
       <Inline gap="0.75rem" wrap="wrap" align="center">
         <Button primary onclick={onSendTest} disabled={!testRows.length}>

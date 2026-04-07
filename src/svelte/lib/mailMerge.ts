@@ -238,10 +238,12 @@ export function configIsReady(config: MailMergeConfig): boolean {
     config.contentSource === "draft"
       ? Boolean(config.draftId.trim())
       : Boolean(config.template.trim());
+  const hasSubject =
+    config.contentSource === "draft" ? true : Boolean(config.subject.trim());
   return Boolean(
     hasContent &&
     config.to.trim() &&
-    config.subject.trim() &&
+    hasSubject &&
     (!config.useMergeIf || config.mergeFormula.trim()),
   );
 }

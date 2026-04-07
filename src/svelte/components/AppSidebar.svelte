@@ -117,6 +117,12 @@
     status: "",
   });
 
+  let errorDialog = $state({
+    open: false,
+    title: "",
+    message: "",
+  });
+
   let receiptResult = $state<CheckReceiptsResult | null>(null);
   let receiptChecking = $state(false);
   let receiptAction = $state<"checking" | "enabling" | null>(null);
@@ -198,6 +204,33 @@
     if (error instanceof Error) {
       return error.message;
     }
+    if (typeof error === "object" && error !== null) {
+      const candidate = error as {
+        message?: unknown;
+        details?: unknown;
+        toString?: () => string;
+      };
+      if (typeof candidate.message === "string" && candidate.message.trim()) {
+        return candidate.message;
+      }
+      if (typeof candidate.details === "string" && candidate.details.trim()) {
+        return candidate.details;
+      }
+      if (
+        typeof candidate.toString === "function" &&
+        candidate.toString !== Object.prototype.toString
+      ) {
+        const rendered = candidate.toString();
+        if (rendered && rendered !== "[object Object]") {
+          return rendered;
+        }
+      }
+      try {
+        return JSON.stringify(error);
+      } catch {
+        return "Unknown error";
+      }
+    }
     return String(error);
   }
 
@@ -211,9 +244,19 @@
     ui.busyMessage = "";
   }
 
+  function openErrorDialog(title: string, message: string) {
+    ui.errorMessage = "";
+    errorDialog.open = true;
+    errorDialog.title = title;
+    errorDialog.message = message;
+  }
+
   function initializeAccordionState(nextConfig: MailMergeConfig) {
     const isReady = configIsReady(nextConfig);
-    const hasTemplate = Boolean(nextConfig.template?.trim());
+    const hasContent =
+      nextConfig.contentSource === "draft"
+        ? Boolean(nextConfig.draftId?.trim())
+        : Boolean(nextConfig.template?.trim());
 
     if (nextConfig.autoCheckReceipts) {
       configOpen = false;
@@ -227,7 +270,7 @@
       receiptsOpen = false;
     } else {
       configOpen = true;
-      templateOpen = !hasTemplate;
+      templateOpen = !hasContent;
       testOpen = false;
       receiptsOpen = false;
     }
@@ -235,12 +278,33 @@
     accordionStateInitialized = true;
   }
 
+  function hasSavedConfigValues(
+    config: MailMergeConfig,
+    sheetName: string,
+  ): boolean {
+    const defaultJobName = `${sheetName} Mail Merge`;
+    return Boolean(
+      config.jobName !== defaultJobName ||
+        Number(config.headerRows) !== 1 ||
+        config.to.trim() ||
+        config.cc.trim() ||
+        config.bcc.trim() ||
+        config.subject.trim() ||
+        config.useMergeIf ||
+        config.mergeFormula.trim() ||
+        !config.trackReceipt ||
+        config.autoCheckReceipts ||
+        config.contentSource !== "template" ||
+        config.draftId.trim(),
+    );
+  }
+
   function hydrateConfig(info: SheetConfigState) {
     sheetData.sheet = info.sheet ?? "";
     const nextConfig = { ...emptyConfig(), ...(info.config ?? emptyConfig()) };
     config = nextConfig;
     mergeCondition = mergeConditionFromConfig(sheetData.headers, nextConfig);
-    ui.editing = !configIsReady(nextConfig);
+    ui.editing = !hasSavedConfigValues(nextConfig, sheetData.sheet);
 
     if (!accordionStateInitialized) {
       initializeAccordionState(nextConfig);
@@ -326,6 +390,39 @@
     } catch (error) {
       if (token === refreshToken) {
         ui.errorMessage = formatError(error);
+      }
+    }
+  }
+
+  async function loadSheetCore(
+    token = refreshToken,
+    options: { showLoading?: boolean } = {},
+  ) {
+    const showLoading = options.showLoading ?? false;
+    if (showLoading) {
+      ui.loading = true;
+    }
+    try {
+      const [configInfo, headersInfo] = await Promise.all([
+        GoogleAppsScript.loadSheetConfig(),
+        GoogleAppsScript.loadSheetHeaders(),
+      ]);
+      if (token !== refreshToken) {
+        return;
+      }
+      hydrateConfig(configInfo);
+      hydrateHeaders(headersInfo);
+      ui.errorMessage = "";
+      if (!test.address && ui.email) {
+        test.address = ui.email;
+      }
+    } catch (error) {
+      if (token === refreshToken) {
+        ui.errorMessage = formatError(error);
+      }
+    } finally {
+      if (showLoading && token === refreshToken) {
+        ui.loading = false;
       }
     }
   }
@@ -495,7 +592,7 @@
   async function refreshSidebar() {
     const token = refreshToken + 1;
     refreshToken = token;
-    await loadSheetConfig(token);
+    await loadSheetCore(token);
     loadSidebarSupplements(token);
   }
 
@@ -523,10 +620,11 @@
       ui.errorMessage = "";
     } else if (initialSheetConfig) {
       hydrateConfig(initialSheetConfig);
+      await loadSheetHeaders(token);
       ui.loading = false;
       ui.errorMessage = "";
     } else {
-      await loadSheetConfig(token);
+      await loadSheetCore(token, { showLoading: true });
     }
 
     ui.email = await emailPromise;
@@ -646,11 +744,16 @@
 
   async function sendTestEmail() {
     if (!test.row) {
-      test.status = "Please choose a row.";
+      test.status = "";
+      openErrorDialog("Unable to send test email", "Please choose a row.");
       return;
     }
     if (!test.address) {
-      test.status = "Please enter a test email address.";
+      test.status = "";
+      openErrorDialog(
+        "Unable to send test email",
+        "Please enter a test email address.",
+      );
       return;
     }
 
@@ -662,9 +765,11 @@
       );
       test.status = `Test email sent to ${result.to}.`;
       ui.errorMessage = "";
+      errorDialog.open = false;
     } catch (error) {
+      const message = formatError(error);
       test.status = "";
-      ui.errorMessage = formatError(error);
+      openErrorDialog("Unable to send test email", message);
     } finally {
       clearBusy();
     }
@@ -752,7 +857,11 @@
   --button-font-size="12px"
   --heading-font-size="1.1rem"
 >
-  {#if !ui.loading && sheetData.headers.length === 0}
+  {#if ui.loading}
+    <Container padding="8px">
+      <p>Loading sheet...</p>
+    </Container>
+  {:else if sheetData.headers.length === 0}
     <Container padding="8px">
       <Inline
         ><h1>Your Sheet is Empty!</h1>
@@ -826,6 +935,20 @@
         </Dialog>
       {/if}
 
+      <Dialog
+        --dialog-min-width="unset"
+        --dialog-max-width="unset"
+        --dialog-max-height="unset"
+        --dialog-min-height="unset"
+        open={errorDialog.open}
+        onClose={() => (errorDialog.open = false)}
+      >
+        <div style="width: 80%; margin: 0 auto;">
+          <h2>{errorDialog.title || "Error"}</h2>
+          <p>{errorDialog.message}</p>
+        </div>
+      </Dialog>
+
       <ConfigPanel
         email={ui.email}
         loading={ui.loading}
@@ -838,6 +961,7 @@
         bind:cc={config.cc}
         bind:bcc={config.bcc}
         bind:subject={config.subject}
+        contentSource={config.contentSource}
         headers={sheetData.headers}
         bind:selectedEmail={selection.email}
         bind:selectedCc={selection.cc}
@@ -917,7 +1041,7 @@
                 {:else if capabilities.gmailDrafts.available}
                   <Stack>
                     <p>
-                      Use a Gmail draft as the body source for this mail merge.
+                      Use a Gmail draft as the message source for this mail merge.
                     </p>
                     <Inline align="center">
                       <Select

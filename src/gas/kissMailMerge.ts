@@ -39,8 +39,9 @@ import { cleanupObject, withTiming } from "./utils";
 
 const CONFIG_SHEET_SUFFIX = " Mail Merge Config";
 
-type DraftSendSource = {
+type MailMergeSendSource = {
   htmlBody: string;
+  subject: string;
   assets?: EmailSendAssets;
 };
 
@@ -136,7 +137,8 @@ function getColumnHeadersForSheet(
       dataRange.getNumColumns(),
     )
     .getValues()[0]
-    .map((header) => String(header ?? ""));
+    .map((header) => String(header ?? "").trim())
+    .filter(Boolean);
 }
 
 function getSampleRows(headerRows: number): unknown[][] {
@@ -337,7 +339,7 @@ function getDraftWarnings(htmlBody: string): string[] {
   const warnings: string[] = [];
   if (/src\s*=\s*["']cid:/i.test(htmlBody)) {
     warnings.push(
-      "This draft contains embedded Gmail images (cid:...). KISS will try to include them when sending.",
+      "This email includes internal images. Send a test email to confirm they appear correctly.",
     );
   }
   if (/src\s*=\s*["']data:image\//i.test(htmlBody)) {
@@ -365,7 +367,7 @@ function extractInlineImageIds(rawContent: string): string[] {
   return ids;
 }
 
-function getDraftSendSource(draftId: string): DraftSendSource {
+function getDraftSendSource(draftId: string): MailMergeSendSource {
   return withTiming("kissMailMerge.getDraftSendSource", { draftId }, () => {
     const draft = GmailApp.getDraft(draftId);
     if (!draft) {
@@ -403,6 +405,7 @@ function getDraftSendSource(draftId: string): DraftSendSource {
 
     return {
       htmlBody,
+      subject: message.getSubject() || "",
       assets: Object.keys(assets).length ? assets : undefined,
     };
   });
@@ -454,7 +457,7 @@ export function getDraftTemplate(draftId: string): GmailDraftTemplate {
   });
 }
 
-function getBodySource(config: MailMergeConfig): DraftSendSource {
+function getSendSource(config: MailMergeConfig): MailMergeSendSource {
   if (config.contentSource === "draft") {
     const draftId = String(config.draftId || "").trim();
     if (!draftId) {
@@ -462,7 +465,10 @@ function getBodySource(config: MailMergeConfig): DraftSendSource {
     }
     return getDraftSendSource(draftId);
   }
-  return { htmlBody: config.template };
+  return {
+    htmlBody: config.template,
+    subject: config.subject,
+  };
 }
 
 export function enableAutoReceiptChecks(sheetName?: string): MailMergeConfig {
@@ -582,11 +588,11 @@ export function sendTestEmail(
   }
 
   const config = getMergeSettings().table as MailMergeConfig;
-  const draftSource = getBodySource(config);
-  const bodyTemplate = draftSource.htmlBody;
-  if (!bodyTemplate || !config.subject) {
+  const sendSource = getSendSource(config);
+  const bodyTemplate = sendSource.htmlBody;
+  if (!bodyTemplate || !sendSource.subject) {
     throw new Error(
-      "Missing template or subject. Please save your configuration and template first.",
+      "Missing email content or subject. Save your template or select a Gmail draft first.",
     );
   }
 
@@ -627,13 +633,13 @@ export function sendTestEmail(
 
   sendEmailFromTemplate(
     testAddress,
-    config.subject,
+    sendSource.subject,
     bodyTemplate,
     rowObject,
     false,
     "",
     "",
-    draftSource.assets,
+    sendSource.assets,
   );
   return { row: Number(rowNumber), to: testAddress };
 }
@@ -652,16 +658,17 @@ export function doMerge(sheetName?: string): MailMergeResult {
     sheet.getName(),
     getMergeSettings().table as Record<string, unknown>,
   );
-  const draftSource = getBodySource(config);
-  const bodyTemplate = draftSource.htmlBody;
-  if (!bodyTemplate || !config.to || !config.subject) {
+  const sendSource = getSendSource(config);
+  const bodyTemplate = sendSource.htmlBody;
+  if (!bodyTemplate || !config.to || !sendSource.subject) {
     throw new Error(
-      "Missing template, recipient, or subject. Open the sidebar and save configuration first.",
+      "Missing email content, recipient, or subject. Open the sidebar and save configuration first.",
     );
   }
 
   const mergeConfig = {
     ...config,
+    subject: sendSource.subject,
     template: bodyTemplate,
   };
   const plan = buildMailMergePlan(sheet, mergeConfig);
@@ -699,7 +706,7 @@ export function doMerge(sheetName?: string): MailMergeResult {
     return { successful: 0, errors: 0, cancelled: true, pendingCount };
   }
 
-  const result = doMailMerge(sheet, mergeConfig, draftSource.assets, plan);
+  const result = doMailMerge(sheet, mergeConfig, sendSource.assets, plan);
 
   const sentLabel = `${result.successful} sent`;
   const errorLabel = `${result.errors} error${result.errors === 1 ? "" : "s"}`;
@@ -723,9 +730,18 @@ export function checkReceipts(sheetName?: string): CheckReceiptsResult {
     throw new Error(`Unable to find sheet ${sheetName}`);
   }
 
+  const rawConfigSheet = spreadsheet.getSheetByName(getConfigSheetName(sheet));
+  if (!rawConfigSheet) {
+    throw new Error(
+      "No mail merge setup found for this sheet. Open Configure Mail Merge first.",
+    );
+  }
+
+  const configSheet = ConfigurationSheet(rawConfigSheet);
+  configSheet.loadConfigurationTable();
   const config = toMailMergeConfig(
     sheet.getName(),
-    getMergeSettings().table as Record<string, unknown>,
+    configSheet.table as Record<string, unknown>,
   );
   if (!config.trackReceipt) {
     throw new Error(

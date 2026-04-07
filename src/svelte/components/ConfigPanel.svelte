@@ -1,4 +1,5 @@
 <script lang="ts">
+  import type { ContentSource } from "../../shared/mailMerge";
   import {
     Accordion,
     Button,
@@ -42,6 +43,7 @@
     cc = $bindable(""),
     bcc = $bindable(""),
     subject = $bindable(""),
+    contentSource = "template",
     headers = [],
     selectedEmail = $bindable(""),
     selectedCc = $bindable(""),
@@ -68,6 +70,7 @@
     cc?: string;
     bcc?: string;
     subject?: string;
+    contentSource?: ContentSource;
     headers?: string[];
     selectedEmail?: string;
     selectedCc?: string;
@@ -86,6 +89,7 @@
 
   let open = $state(initiallyOpen);
   let aboutTrackingDialogOpen = $state(false);
+  const subjectManagedByDraft = $derived(contentSource === "draft");
 
   const needsValue = (formula: string) =>
     specialConditions.find((c) => c.formula === formula)?.needsValue ?? false;
@@ -208,15 +212,29 @@
 
           <FormItem fullWidth>
             {#snippet label()}Subject{/snippet}
-            <Input type="text" bind:value={subject} />
+            <Input
+              type="text"
+              bind:value={subject}
+              disabled={subjectManagedByDraft}
+              placeholder={subjectManagedByDraft
+                ? "Subject comes from the selected Gmail draft"
+                : undefined}
+            />
             {#snippet after()}
-              <Select bind:value={selectedSubject} onchange={addSubjectField}>
+              <Select
+                bind:value={selectedSubject}
+                onchange={addSubjectField}
+                disabled={subjectManagedByDraft}
+              >
                 <Option value="">Add field...</Option>
                 {#each headers as h}
                   <Option value={h}>{h}</Option>
                 {/each}
               </Select>
             {/snippet}
+            {#if subjectManagedByDraft}
+              <p>Subject is taken from the selected Gmail draft in draft mode.</p>
+            {/if}
           </FormItem>
         </Form>
 
@@ -414,7 +432,13 @@
             {/if}
             <tr>
               <th>Subject</th>
-              <td>{subject}</td>
+              <td>
+                {#if subjectManagedByDraft}
+                  From selected Gmail draft
+                {:else}
+                  {subject}
+                {/if}
+              </td>
             </tr>
             <tr>
               <th>Receipt Tracking</th>

@@ -110,7 +110,7 @@ export function loadDraftTemplate(draftId: string): GmailDraftTemplate {
     htmlBody: body,
     warnings: isFollowup
       ? [
-          "This draft contains embedded Gmail images (cid:...). KISS will try to include them when sending.",
+          "This email includes internal images. Send a test email to confirm they appear correctly.",
         ]
       : [],
     previewInlineImages: isFollowup
