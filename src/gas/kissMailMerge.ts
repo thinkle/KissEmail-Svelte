@@ -308,13 +308,22 @@ export function saveConfig(
 ): MailMergeConfig {
   const configSheet = getMergeSettings();
   const sheet = getDataSheet();
+  const previousConfig = toMailMergeConfig(
+    sheet.getName(),
+    configSheet.table as Record<string, unknown>,
+  );
   configSheet.table = {
     ...configSheet.table,
     ...settings,
   };
   configSheet.writeConfigurationTable();
   const nextConfig = toMailMergeConfig(sheet.getName(), configSheet.table);
-  syncAutoReceiptMonitoring(sheet, nextConfig);
+  if (
+    previousConfig.trackReceipt !== nextConfig.trackReceipt ||
+    previousConfig.autoCheckReceipts !== nextConfig.autoCheckReceipts
+  ) {
+    syncAutoReceiptMonitoring(sheet, nextConfig);
+  }
   return nextConfig;
 }
 

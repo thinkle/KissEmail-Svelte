@@ -60,6 +60,9 @@ export type ConfigurationSheetHandle = {
 export function ConfigurationSheet(
   sheet: GoogleAppsScript.Spreadsheet.Sheet
 ): ConfigurationSheetHandle {
+  const sheetName = sheet.getName();
+  const sheetId = sheet.getSheetId();
+
   function singleColumn<T>(values: T[]): T[][] {
     return values.map((value) => [value]);
   }
@@ -67,7 +70,7 @@ export function ConfigurationSheet(
   function overwriteConfiguration(
     keyValues: Record<string, unknown>,
     listValues: Record<string, unknown[]>
-  ) {
+  ): { rowCount: number; columnCount: number } {
     const keyEntries = Object.entries(keyValues);
     const listEntries = Object.entries(listValues);
     const maxListLength = listEntries.reduce(
@@ -80,7 +83,7 @@ export function ConfigurationSheet(
     sheet.clear();
 
     if (!rowCount) {
-      return;
+      return { rowCount, columnCount };
     }
 
     const grid = Array.from({ length: rowCount }, () =>
@@ -165,9 +168,12 @@ export function ConfigurationSheet(
     }
 
     range.setWrap(true);
+    return { rowCount, columnCount };
   }
 
-  function overwriteConfigurationTable(table: ConfigTable) {
+  function overwriteConfigurationTable(
+    table: ConfigTable
+  ): { rowCount: number; columnCount: number } {
     const keyValues: Record<string, unknown> = {};
     const listValues: Record<string, unknown[]> = {};
 
@@ -179,15 +185,17 @@ export function ConfigurationSheet(
       }
     }
 
-    overwriteConfiguration(keyValues, listValues);
+    return overwriteConfiguration(keyValues, listValues);
   }
 
   function getConfigurationTable(): ConfigTable {
-    if (sheet.getLastRow() === 0) {
+    const lastRow = sheet.getLastRow();
+    if (lastRow === 0) {
       return {};
     }
 
-    const keyValues = sheet.getRange(1, 1, sheet.getLastRow(), 2).getValues();
+    const lastColumn = sheet.getLastColumn();
+    const keyValues = sheet.getRange(1, 1, lastRow, 2).getValues();
     const data: ConfigTable = {};
     keyValues.forEach(([key, value]) => {
       if (key) {
@@ -195,9 +203,9 @@ export function ConfigurationSheet(
       }
     });
 
-    const listColumnCount = Math.max(sheet.getLastColumn() - 2, 0);
+    const listColumnCount = Math.max(lastColumn - 2, 0);
     if (listColumnCount > 0) {
-      const listValues = sheet.getRange(1, 3, sheet.getLastRow(), listColumnCount).getValues();
+      const listValues = sheet.getRange(1, 3, lastRow, listColumnCount).getValues();
       const valueListHeaders: string[] = [];
       for (let columnIndex = 0; columnIndex < listColumnCount; columnIndex += 1) {
         const header = String(listValues[0]?.[columnIndex] ?? "");
@@ -206,7 +214,7 @@ export function ConfigurationSheet(
           continue;
         }
         const valueList: unknown[] = [];
-        for (let rowIndex = 1; rowIndex < sheet.getLastRow(); rowIndex += 1) {
+        for (let rowIndex = 1; rowIndex < lastRow; rowIndex += 1) {
           valueList.push(listValues[rowIndex]?.[columnIndex]);
         }
         data[header] = valueList;
@@ -232,10 +240,10 @@ export function ConfigurationSheet(
   return {
     table: {},
     getSheetLink() {
-      return `${sheet.getParent().getUrl()}#gid=${sheet.getSheetId()}`;
+      return `${sheet.getParent().getUrl()}#gid=${sheetId}`;
     },
     getSheetId() {
-      return sheet.getSheetId();
+      return sheetId;
     },
     loadConfigurationTable() {
       const startedAt = Date.now();
@@ -243,8 +251,8 @@ export function ConfigurationSheet(
       console.log(
         JSON.stringify({
           event: "ConfigurationSheet.loadConfigurationTable",
-          sheetName: sheet.getName(),
-          sheetId: sheet.getSheetId(),
+          sheetName,
+          sheetId,
           durationMs: Date.now() - startedAt,
           keys: Object.keys(this.table).length,
         }),
@@ -255,16 +263,16 @@ export function ConfigurationSheet(
         this.table = table;
       }
       const startedAt = Date.now();
-      overwriteConfigurationTable(this.table);
+      const dimensions = overwriteConfigurationTable(this.table);
       console.log(
         JSON.stringify({
           event: "ConfigurationSheet.writeConfigurationTable",
-          sheetName: sheet.getName(),
-          sheetId: sheet.getSheetId(),
+          sheetName,
+          sheetId,
           durationMs: Date.now() - startedAt,
           keys: Object.keys(this.table).length,
-          rows: sheet.getLastRow(),
-          columns: sheet.getLastColumn(),
+          rows: dimensions.rowCount,
+          columns: dimensions.columnCount,
         }),
       );
     },
