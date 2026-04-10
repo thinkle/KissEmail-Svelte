@@ -6,6 +6,7 @@
     Inline,
     Input,
     Option,
+    Progress,
     Select,
     Stack,
     Tag,
@@ -19,6 +20,8 @@
     testRow = $bindable(""),
     testAddress = $bindable(""),
     testStatus = "",
+    sending = false,
+    disabled = false,
     onSendTest,
   }: {
     initiallyOpen?: boolean;
@@ -26,6 +29,8 @@
     testRow?: string;
     testAddress?: string;
     testStatus?: string;
+    sending?: boolean;
+    disabled?: boolean;
     onSendTest: () => void;
   } = $props();
 
@@ -39,7 +44,7 @@
     <Stack>
       <FormItem fullWidth>
         {#snippet label()}Pick Row{/snippet}
-        <Select bind:value={testRow}>
+        <Select bind:value={testRow} disabled={sending || disabled}>
           {#each testRows as r}
             <Option value={String(r.row)}>
               Row {r.row}{r.to ? ` - ${r.to}` : ""}
@@ -50,19 +55,33 @@
 
       <FormItem fullWidth>
         {#snippet label()}Send To{/snippet}
-        <Input type="email" bind:value={testAddress} />
+        <Input
+          type="email"
+          bind:value={testAddress}
+          disabled={sending || disabled}
+        />
       </FormItem>
 
       <p>Uses saved configuration and the selected template or Gmail draft. CC/BCC are ignored.</p>
 
       <Inline gap="0.75rem" wrap="wrap" align="center">
-        <Button primary onclick={onSendTest} disabled={!testRows.length}>
-          Send Test Email
+        <Button
+          primary
+          onclick={onSendTest}
+          disabled={!testRows.length || sending || disabled}
+        >
+          {sending ? "Sending..." : "Send Test Email"}
         </Button>
         {#if testStatus}
           <Tag>{testStatus}</Tag>
         {/if}
       </Inline>
+      {#if sending}
+        <Stack>
+          <Progress value={65} max={100} width="12rem" />
+          <p>Sending test email...</p>
+        </Stack>
+      {/if}
     </Stack>
   </details>
 </Accordion>

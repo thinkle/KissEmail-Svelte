@@ -22,6 +22,7 @@
     autoReceiptStatus = { enabled: false },
     loading = false,
     busyAction = null,
+    disabled = false,
     result = null,
     onCheckReceipts,
     onEnableAutoCheck,
@@ -32,6 +33,7 @@
     autoReceiptStatus?: AutoReceiptStatus;
     loading?: boolean;
     busyAction?: "checking" | "enabling" | null;
+    disabled?: boolean;
     result?: CheckReceiptsResult | null;
     onCheckReceipts: () => void;
     onEnableAutoCheck: () => void;
@@ -39,7 +41,7 @@
 
   let open = $state(initiallyOpen);
   let aboutTrackingDialogOpen = $state(false);
-  const busy = $derived(Boolean(busyAction));
+  const busy = $derived(Boolean(busyAction) || disabled);
 
   function formatTimestamp(value?: string): string {
     if (!value) {

@@ -34,7 +34,6 @@
     TestRow,
   } from "../../shared/mailMerge";
   import { GoogleAppsScript } from "../gasApi";
-  import BusyOverlay from "./BusyOverlay.svelte";
   import AboutKiss from "./AboutKiss.svelte";
   import ConfigPanel from "./ConfigPanel.svelte";
   import FooterBar from "./FooterBar.svelte";
@@ -84,12 +83,11 @@
 
   let ui = $state({
     email: "",
-    busy: false,
-    busyMessage: "",
     loading: true,
     merging: false,
     editing: true,
     errorMessage: "",
+    actionBusy: null as "savingConfig" | "sendingTest" | "openingEditor" | null,
   });
 
   let sheetData = $state({
@@ -198,6 +196,11 @@
     ),
   );
   const ready = $derived(configIsReady(computedConfig));
+  const sidebarActionLocked = $derived(
+    Boolean(ui.actionBusy) || ui.merging || Boolean(receiptAction),
+  );
+  const configSaving = $derived(ui.actionBusy === "savingConfig");
+  const testSending = $derived(ui.actionBusy === "sendingTest");
   const kissEnvelopeSrc = `data:image/svg+xml;utf8,${encodeURIComponent(kissEnvelopeSvg)}`;
 
   function formatError(error: unknown): string {
@@ -234,16 +237,6 @@
     return String(error);
   }
 
-  function setBusy(message: string) {
-    ui.busy = true;
-    ui.busyMessage = message;
-  }
-
-  function clearBusy() {
-    ui.busy = false;
-    ui.busyMessage = "";
-  }
-
   function openErrorDialog(title: string, message: string) {
     ui.errorMessage = "";
     errorDialog.open = true;
@@ -278,25 +271,14 @@
     accordionStateInitialized = true;
   }
 
-  function hasSavedConfigValues(
-    config: MailMergeConfig,
-    sheetName: string,
-  ): boolean {
-    const defaultJobName = `${sheetName} Mail Merge`;
-    return Boolean(
-      config.jobName !== defaultJobName ||
-        Number(config.headerRows) !== 1 ||
-        config.to.trim() ||
-        config.cc.trim() ||
-        config.bcc.trim() ||
-        config.subject.trim() ||
-        config.useMergeIf ||
-        config.mergeFormula.trim() ||
-        !config.trackReceipt ||
-        config.autoCheckReceipts ||
-        config.contentSource !== "template" ||
-        config.draftId.trim(),
-    );
+  function configPanelIsComplete(config: MailMergeConfig): boolean {
+    if (!config.to.trim()) {
+      return false;
+    }
+    if (config.contentSource === "draft") {
+      return true;
+    }
+    return Boolean(config.subject.trim());
   }
 
   function hydrateConfig(info: SheetConfigState) {
@@ -304,7 +286,7 @@
     const nextConfig = { ...emptyConfig(), ...(info.config ?? emptyConfig()) };
     config = nextConfig;
     mergeCondition = mergeConditionFromConfig(sheetData.headers, nextConfig);
-    ui.editing = !hasSavedConfigValues(nextConfig, sheetData.sheet);
+    ui.editing = !configPanelIsComplete(nextConfig);
 
     if (!accordionStateInitialized) {
       initializeAccordionState(nextConfig);
@@ -650,7 +632,7 @@
       draftId: config.draftId,
     };
 
-    setBusy("Saving configuration...");
+    ui.actionBusy = "savingConfig";
     try {
       await GoogleAppsScript.saveMailMergeConfig(payload);
       ui.editing = false;
@@ -659,7 +641,7 @@
     } catch (error) {
       ui.errorMessage = formatError(error);
     } finally {
-      clearBusy();
+      ui.actionBusy = null;
     }
   }
 
@@ -693,7 +675,7 @@
   }
 
   async function openEditor() {
-    setBusy("Opening editor...");
+    ui.actionBusy = "openingEditor";
     try {
       templatePollBaseline = config.template;
       templatePollAttempts = 0;
@@ -703,7 +685,7 @@
     } catch (error) {
       ui.errorMessage = formatError(error);
     } finally {
-      clearBusy();
+      ui.actionBusy = null;
     }
   }
 
@@ -712,9 +694,6 @@
   }
 
   async function doMerge() {
-    setBusy(
-      "Sending mail merge... This can take a while if you have a lot of emails to send, but don't worry, you can close this sidebar and the merge will continue in the background! If the merge times out before it's done, just come back to the sidebar and click 'Do Merge' again to resume where it left off.",
-    );
     ui.merging = true;
     try {
       const result = await GoogleAppsScript.runMailMerge(sheetData.sheet);
@@ -738,7 +717,6 @@
       ui.errorMessage = formatError(error);
     } finally {
       ui.merging = false;
-      clearBusy();
     }
   }
 
@@ -757,7 +735,7 @@
       return;
     }
 
-    setBusy("Sending test email...");
+    ui.actionBusy = "sendingTest";
     try {
       const result = await GoogleAppsScript.sendMailMergeTestEmail(
         Number(test.row),
@@ -771,7 +749,7 @@
       test.status = "";
       openErrorDialog("Unable to send test email", message);
     } finally {
-      clearBusy();
+      ui.actionBusy = null;
     }
   }
 
@@ -880,7 +858,6 @@
     </Container>
   {:else}
     <Stack>
-      <BusyOverlay busy={ui.busy} message={ui.busyMessage} />
       <Inline>
         <Inline gap="0" align="center">
           <img
@@ -953,6 +930,8 @@
         email={ui.email}
         loading={ui.loading}
         editing={ui.editing}
+        saving={configSaving}
+        disabled={sidebarActionLocked && !configSaving}
         initiallyOpen={configOpen}
         bind:jobName={config.jobName}
         bind:sheet={sheetData.sheet}
@@ -975,7 +954,11 @@
         canCheckReceipts={capabilities.receiptChecks.available}
         canScheduleReceipts={capabilities.receiptScheduling.available}
         onSaveConfig={saveConfig}
-        onToggleEdit={() => (ui.editing = true)}
+        onToggleEdit={() => {
+          if (!sidebarActionLocked) {
+            ui.editing = true;
+          }
+        }}
       />
 
       <Accordion>
@@ -1033,6 +1016,7 @@
                 )}
                 warningReport={templateWarnings}
                 onOpenEditor={openEditor}
+                openEditorDisabled={sidebarActionLocked}
               />
             {:else}
               <Stack>
@@ -1110,6 +1094,7 @@
                           showOpenEditorButton={false}
                           warningReport={draftWarnings}
                           onOpenEditor={openEditor}
+                          openEditorDisabled={sidebarActionLocked}
                         />
                       {/if}
                     </Stack>
@@ -1127,6 +1112,8 @@
         bind:testRow={test.row}
         bind:testAddress={test.address}
         testStatus={test.status}
+        sending={testSending}
+        disabled={sidebarActionLocked && !testSending}
         onSendTest={sendTestEmail}
       />
 
@@ -1137,12 +1124,18 @@
         {autoReceiptStatus}
         loading={receiptChecking}
         busyAction={receiptAction}
+        disabled={sidebarActionLocked && !receiptAction}
         result={receiptResult}
         onCheckReceipts={checkReceipts}
         onEnableAutoCheck={enableAutoReceiptChecks}
       />
 
-      <FooterBar {ready} merging={ui.merging} onMerge={doMerge} />
+      <FooterBar
+        {ready}
+        merging={ui.merging}
+        disabled={sidebarActionLocked && !ui.merging}
+        onMerge={doMerge}
+      />
       <div class="spacer" style="height: 70px;"></div>
       <div
         style="position: fixed; bottom: 0; width: 100%; 

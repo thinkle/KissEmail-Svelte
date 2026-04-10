@@ -7,10 +7,12 @@
     Dialog,
     Fieldset,
     Form,
+    FormProvider,
     FormItem,
     Inline,
     Input,
     Option,
+    Progress,
     Select,
     Stack,
     Table,
@@ -56,6 +58,8 @@
     autoCheckReceipts = $bindable(false),
     canCheckReceipts = true,
     canScheduleReceipts = true,
+    saving = false,
+    disabled = false,
     onSaveConfig,
     onToggleEdit,
   }: {
@@ -83,6 +87,8 @@
     autoCheckReceipts?: boolean;
     canCheckReceipts?: boolean;
     canScheduleReceipts?: boolean;
+    saving?: boolean;
+    disabled?: boolean;
     onSaveConfig: () => void;
     onToggleEdit: () => void;
   } = $props();
@@ -129,340 +135,351 @@
   }
 </script>
 
-<Accordion>
-  <details bind:open>
-    <summary>Configuration</summary>
+<FormProvider
+  fullWidth
+  layout="side"
+  collapseSide={false}
+  --form-label-width="120px"
+  --form-input-width="260px"
+>
+  <Accordion>
+    <details bind:open>
+      <summary>Configuration</summary>
 
-    {#if loading}
-      Loading configuration...
-    {:else if editing}
-      <Stack>
-        <Inline gap="0.75rem" wrap="wrap" align="center">
-          {email || "loading account..."}
-        </Inline>
+      {#if loading}
+        Loading configuration...
+      {:else if editing}
+        <Stack>
+          <Form onsubmit={(event) => event.preventDefault()}>
+            <FormItem>
+              {#snippet label()}Sheet{/snippet}
+              <b>{sheet}</b>
+            </FormItem>
+            <FormItem>
+              {#snippet label()}Subject{/snippet}
+              <Stack>
+                <Input
+                  type="text"
+                  bind:value={subject}
+                  disabled={subjectManagedByDraft}
+                  placeholder={subjectManagedByDraft
+                    ? "Subject comes from the selected Gmail draft"
+                    : undefined}
+                />
+                <Select
+                  bind:value={selectedSubject}
+                  onchange={addSubjectField}
+                  disabled={subjectManagedByDraft}
+                >
+                  <Option value="">Add field...</Option>
+                  {#each headers as h}
+                    <Option value={h}>{h}</Option>
+                  {/each}
+                </Select>
+                {#if subjectManagedByDraft}
+                  <p>
+                    Subject is taken from the selected Gmail draft in draft
+                    mode.
+                  </p>
+                {/if}
+              </Stack>
+            </FormItem>
 
-        <Form onsubmit={(event) => event.preventDefault()}>
-          <FormItem fullWidth>
-            {#snippet label()}Job Name{/snippet}
-            <Input type="text" bind:value={jobName} />
-          </FormItem>
+            <FormItem>
+              {#snippet label()}Header Rows{/snippet}
+              <Input
+                type="number"
+                min="1"
+                value={String(headerRows)}
+                oninput={handleHeaderRowsChange}
+              />
+            </FormItem>
 
-          <FormItem fullWidth>
-            {#snippet label()}Sheet{/snippet}
-            <Input type="text" bind:value={sheet} />
-          </FormItem>
+            <FormItem>
+              {#snippet label()}To{/snippet}
+              <Stack>
+                <Input type="text" bind:value={to} placeholder={"{{Email}}"} />
+                <Select
+                  bind:value={selectedEmail}
+                  onchange={() => appendRecipient("to", selectedEmail)}
+                >
+                  <Option value="">Add field...</Option>
+                  {#each headers as h}
+                    <Option value={h}>{h}</Option>
+                  {/each}
+                </Select>
+              </Stack>
+            </FormItem>
 
-          <FormItem fullWidth>
-            {#snippet label()}Header Rows{/snippet}
-            <Input
-              type="number"
-              min="1"
-              value={String(headerRows)}
-              oninput={handleHeaderRowsChange}
-            />
-          </FormItem>
+            <FormItem>
+              {#snippet label()}CC{/snippet}
+              <Stack>
+                <Input type="text" bind:value={cc} placeholder={"{{Email}}"} />
+                <Select
+                  bind:value={selectedCc}
+                  onchange={() => appendRecipient("cc", selectedCc)}
+                >
+                  <Option value="">Add field...</Option>
+                  {#each headers as h}
+                    <Option value={h}>{h}</Option>
+                  {/each}
+                </Select>
+              </Stack>
+            </FormItem>
 
-          <FormItem fullWidth>
-            {#snippet label()}To{/snippet}
-            <Input type="text" bind:value={to} placeholder={"{{Email}}"} />
-            {#snippet after()}
-              <Select
-                bind:value={selectedEmail}
-                onchange={() => appendRecipient("to", selectedEmail)}
+            <FormItem>
+              {#snippet label()}BCC{/snippet}
+              <Stack>
+                <Input type="text" bind:value={bcc} placeholder={"{{Email}}"} />
+                <Select
+                  bind:value={selectedBcc}
+                  onchange={() => appendRecipient("bcc", selectedBcc)}
+                >
+                  <Option value="">Add field...</Option>
+                  {#each headers as h}
+                    <Option value={h}>{h}</Option>
+                  {/each}
+                </Select>
+              </Stack>
+            </FormItem>
+          </Form>
+
+          <Fieldset>
+            {#snippet legend()}Merge Conditions{/snippet}
+            <Stack>
+              <Checkbox bind:checked={useMergeIf}
+                >Merge only certain rows</Checkbox
               >
-                <Option value="">Add field...</Option>
-                {#each headers as h}
-                  <Option value={h}>{h}</Option>
-                {/each}
-              </Select>
-            {/snippet}
-          </FormItem>
 
-          <FormItem fullWidth>
-            {#snippet label()}CC{/snippet}
-            <Input type="text" bind:value={cc} placeholder={"{{Email}}"} />
-            {#snippet after()}
-              <Select
-                bind:value={selectedCc}
-                onchange={() => appendRecipient("cc", selectedCc)}
-              >
-                <Option value="">Add field...</Option>
-                {#each headers as h}
-                  <Option value={h}>{h}</Option>
-                {/each}
-              </Select>
-            {/snippet}
-          </FormItem>
-
-          <FormItem fullWidth>
-            {#snippet label()}BCC{/snippet}
-            <Input type="text" bind:value={bcc} placeholder={"{{Email}}"} />
-            {#snippet after()}
-              <Select
-                bind:value={selectedBcc}
-                onchange={() => appendRecipient("bcc", selectedBcc)}
-              >
-                <Option value="">Add field...</Option>
-                {#each headers as h}
-                  <Option value={h}>{h}</Option>
-                {/each}
-              </Select>
-            {/snippet}
-          </FormItem>
-
-          <FormItem fullWidth>
-            {#snippet label()}Subject{/snippet}
-            <Input
-              type="text"
-              bind:value={subject}
-              disabled={subjectManagedByDraft}
-              placeholder={subjectManagedByDraft
-                ? "Subject comes from the selected Gmail draft"
-                : undefined}
-            />
-            {#snippet after()}
-              <Select
-                bind:value={selectedSubject}
-                onchange={addSubjectField}
-                disabled={subjectManagedByDraft}
-              >
-                <Option value="">Add field...</Option>
-                {#each headers as h}
-                  <Option value={h}>{h}</Option>
-                {/each}
-              </Select>
-            {/snippet}
-            {#if subjectManagedByDraft}
-              <p>Subject is taken from the selected Gmail draft in draft mode.</p>
-            {/if}
-          </FormItem>
-        </Form>
-
-        <Fieldset>
-          {#snippet legend()}Merge Conditions{/snippet}
-          <Stack>
-            <Checkbox bind:checked={useMergeIf}
-              >Merge only certain rows</Checkbox
-            >
-
-            {#if useMergeIf}
-              {#if !mergeCondition.doCustomFormula}
-                <FormItem fullWidth>
-                  {#snippet label()}Column{/snippet}
-                  <Select
-                    value={mergeCondition.selectedHeader}
-                    onchange={(event) =>
-                      updateMergeCondition({
-                        selectedHeader: (
-                          event.currentTarget as HTMLSelectElement
-                        ).value,
-                      })}
-                  >
-                    {#each headers as h}
-                      <Option value={h}>{h}</Option>
-                    {/each}
-                  </Select>
-                </FormItem>
-
-                <FormItem fullWidth>
-                  {#snippet label()}Condition{/snippet}
-                  <Select
-                    value={mergeCondition.selectedCondition}
-                    onchange={(event) =>
-                      updateMergeCondition({
-                        selectedCondition: (
-                          event.currentTarget as HTMLSelectElement
-                        ).value,
-                      })}
-                  >
-                    {#each specialConditions as s}
-                      <Option value={s.formula}>{s.label}</Option>
-                    {/each}
-                  </Select>
-                </FormItem>
-
-                {#if needsValue(mergeCondition.selectedCondition)}
+              {#if useMergeIf}
+                {#if !mergeCondition.doCustomFormula}
                   <FormItem fullWidth>
-                    {#snippet label()}Value{/snippet}
+                    {#snippet label()}Column{/snippet}
+                    <Select
+                      value={mergeCondition.selectedHeader}
+                      onchange={(event) =>
+                        updateMergeCondition({
+                          selectedHeader: (
+                            event.currentTarget as HTMLSelectElement
+                          ).value,
+                        })}
+                    >
+                      {#each headers as h}
+                        <Option value={h}>{h}</Option>
+                      {/each}
+                    </Select>
+                  </FormItem>
+
+                  <FormItem fullWidth>
+                    {#snippet label()}Condition{/snippet}
+                    <Select
+                      value={mergeCondition.selectedCondition}
+                      onchange={(event) =>
+                        updateMergeCondition({
+                          selectedCondition: (
+                            event.currentTarget as HTMLSelectElement
+                          ).value,
+                        })}
+                    >
+                      {#each specialConditions as s}
+                        <Option value={s.formula}>{s.label}</Option>
+                      {/each}
+                    </Select>
+                  </FormItem>
+
+                  {#if needsValue(mergeCondition.selectedCondition)}
+                    <FormItem fullWidth>
+                      {#snippet label()}Value{/snippet}
+                      <Input
+                        type="text"
+                        value={mergeCondition.specialConditionText}
+                        oninput={(event) =>
+                          updateMergeCondition({
+                            specialConditionText: (
+                              event.currentTarget as HTMLInputElement
+                            ).value,
+                          })}
+                      />
+                    </FormItem>
+                  {/if}
+                {:else}
+                  <FormItem fullWidth>
+                    {#snippet label()}Custom Formula{/snippet}
                     <Input
                       type="text"
-                      value={mergeCondition.specialConditionText}
+                      value={mergeCondition.customFormula}
                       oninput={(event) =>
                         updateMergeCondition({
-                          specialConditionText: (
+                          customFormula: (
                             event.currentTarget as HTMLInputElement
                           ).value,
                         })}
                     />
                   </FormItem>
                 {/if}
-              {:else}
-                <FormItem fullWidth>
-                  {#snippet label()}Custom Formula{/snippet}
-                  <Input
-                    type="text"
-                    value={mergeCondition.customFormula}
-                    oninput={(event) =>
-                      updateMergeCondition({
-                        customFormula: (event.currentTarget as HTMLInputElement)
-                          .value,
-                      })}
-                  />
-                </FormItem>
+
+                <Checkbox
+                  checked={mergeCondition.doCustomFormula}
+                  onchange={(event) =>
+                    updateMergeCondition({
+                      doCustomFormula: (event.currentTarget as HTMLInputElement)
+                        .checked,
+                    })}
+                >
+                  Use custom formula
+                </Checkbox>
+
+                <p>
+                  Write the formula for the first data row. It will be filled
+                  down automatically.
+                </p>
+              {/if}
+            </Stack>
+          </Fieldset>
+
+          <Fieldset>
+            {#snippet legend()}
+              <Inline
+                >Receipt Tracking
+                <Button onclick={() => (aboutTrackingDialogOpen = true)}>
+                  Learn about tracking
+                </Button>
+              </Inline>
+            {/snippet}
+            <Stack>
+              <Checkbox
+                checked={trackReceipt}
+                disabled={!canCheckReceipts}
+                onchange={(event) => {
+                  trackReceipt = (event.currentTarget as HTMLInputElement)
+                    .checked;
+                  if (!trackReceipt) {
+                    autoCheckReceipts = false;
+                  }
+                }}
+              >
+                Track email opens (1×1 pixel)
+              </Checkbox>
+              <Checkbox
+                bind:checked={autoCheckReceipts}
+                disabled={!trackReceipt || !canScheduleReceipts}
+              >
+                Automatically check receipts hourly
+              </Checkbox>
+              {#if !canCheckReceipts}
+                <p>Receipt tracking requires external-request permission.</p>
+              {:else if !canScheduleReceipts}
+                <p>Hourly auto-check requires trigger permission.</p>
               {/if}
 
-              <Checkbox
-                checked={mergeCondition.doCustomFormula}
-                onchange={(event) =>
-                  updateMergeCondition({
-                    doCustomFormula: (event.currentTarget as HTMLInputElement)
-                      .checked,
-                  })}
+              <Dialog
+                --dialog-min-width="unset"
+                --dialog-max-width="unset"
+                --dialog-max-height="unset"
+                --dialog-min-height="unset"
+                open={aboutTrackingDialogOpen}
+                onClose={() => (aboutTrackingDialogOpen = false)}
               >
-                Use custom formula
-              </Checkbox>
-
-              <p>
-                Write the formula for the first data row. It will be filled down
-                automatically.
-              </p>
-            {/if}
-          </Stack>
-        </Fieldset>
-
-        <Fieldset>
-          {#snippet legend()}
-            <Inline
-              >Receipt Tracking
-              <Button onclick={() => (aboutTrackingDialogOpen = true)}>
-                Learn about tracking
-              </Button>
-            </Inline>
-          {/snippet}
-          <Stack>
-            <Checkbox
-              checked={trackReceipt}
-              disabled={!canCheckReceipts}
-              onchange={(event) => {
-                trackReceipt = (event.currentTarget as HTMLInputElement)
-                  .checked;
-                if (!trackReceipt) {
-                  autoCheckReceipts = false;
-                }
-              }}
-            >
-              Track email opens (1×1 pixel)
-            </Checkbox>
-            <Checkbox
-              bind:checked={autoCheckReceipts}
-              disabled={!trackReceipt || !canScheduleReceipts}
-            >
-              Automatically check receipts hourly
-            </Checkbox>
-            {#if !canCheckReceipts}
-              <p>Receipt tracking requires external-request permission.</p>
-            {:else if !canScheduleReceipts}
-              <p>Hourly auto-check requires trigger permission.</p>
-            {/if}
-
-            <Dialog
-              --dialog-min-width="unset"
-              --dialog-max-width="unset"
-              --dialog-max-height="unset"
-              --dialog-min-height="unset"
-              open={aboutTrackingDialogOpen}
-              onClose={() => (aboutTrackingDialogOpen = false)}
-            >
-              <div style="width: 80%; margin: 0 auto;">
-                <h2>About tracking</h2>
-                <p style="--font-size:0.85em;color:#555;margin:0.5em 0 0;">
-                  A tiny invisible image is embedded in each email. When the
-                  recipient opens it, their email client loads the image and we
-                  record the time. Tracking isn't perfect — many clients block
-                  remote images (Outlook, Thunderbird, and most privacy-focused
-                  apps), so opens go unrecorded. Others like Apple Mail on iOS
-                  15+ go the other way: they pre-load images automatically,
-                  which can log an "open" even if the email was never read. <em
-                    >KISS</em
-                  >
-                  is no less accurate than other tracking; we're just being transparent
-                  about it!
-                </p>
-              </div>
-            </Dialog>
-          </Stack>
-        </Fieldset>
+                <div style="width: 80%; margin: 0 auto;">
+                  <h2>About tracking</h2>
+                  <p style="--font-size:0.85em;color:#555;margin:0.5em 0 0;">
+                    A tiny invisible image is embedded in each email. When the
+                    recipient opens it, their email client loads the image and
+                    we record the time. Tracking isn't perfect — many clients
+                    block remote images (Outlook, Thunderbird, and most
+                    privacy-focused apps), so opens go unrecorded. Others like
+                    Apple Mail on iOS 15+ go the other way: they pre-load images
+                    automatically, which can log an "open" even if the email was
+                    never read. <em>KISS</em>
+                    is no less accurate than other tracking; we're just being transparent
+                    about it!
+                  </p>
+                </div>
+              </Dialog>
+            </Stack>
+          </Fieldset>
 
         <Inline gap="0.75rem" wrap="wrap">
-          <Button primary onclick={onSaveConfig}>Save Configuration</Button>
+          <Button primary onclick={onSaveConfig} disabled={saving || disabled}>
+            {saving ? "Saving..." : "Save Configuration"}
+          </Button>
         </Inline>
+        {#if saving}
+          <Stack>
+            <Progress value={65} max={100} width="12rem" />
+            <p>Saving configuration...</p>
+          </Stack>
+        {/if}
       </Stack>
-    {:else}
-      <Stack>
+      {:else}
+        <Stack>
         <Inline gap="0.75rem" wrap="wrap" align="center">
           Saved configuration
-          <Button onclick={onToggleEdit}>Edit Config</Button>
+          <Button onclick={onToggleEdit} disabled={disabled}>
+            Edit Config
+          </Button>
         </Inline>
 
-        <Table --table-width="100%">
-          <tbody>
-            <tr>
-              <th>Sheet</th>
-              <td>{sheet}</td>
-            </tr>
-            <tr>
-              <th>Header Rows</th>
-              <td>{headerRows}</td>
-            </tr>
-            <tr>
-              <th>To</th>
-              <td>{to}</td>
-            </tr>
-            {#if cc}
+          <Table --table-width="100%">
+            <tbody>
               <tr>
-                <th>CC</th>
-                <td>{cc}</td>
+                <th>Sheet</th>
+                <td>{sheet}</td>
               </tr>
-            {/if}
-            {#if bcc}
               <tr>
-                <th>BCC</th>
-                <td>{bcc}</td>
+                <th>Header Rows</th>
+                <td>{headerRows}</td>
               </tr>
-            {/if}
-            <tr>
-              <th>Subject</th>
-              <td>
-                {#if subjectManagedByDraft}
-                  From selected Gmail draft
-                {:else}
-                  {subject}
-                {/if}
-              </td>
-            </tr>
-            <tr>
-              <th>Receipt Tracking</th>
-              <td>{trackReceipt ? "enabled" : "disabled"}</td>
-            </tr>
-            <tr>
-              <th>Auto Check</th>
-              <td>{trackReceipt && autoCheckReceipts ? "hourly" : "off"}</td>
-            </tr>
-            <tr>
-              <th>Merge Rows</th>
-              <td>
-                {#if useMergeIf}
-                  conditional using {mergeCondition.doCustomFormula
-                    ? "custom formula"
-                    : `${mergeCondition.selectedHeader} ${mergeCondition.selectedCondition}`}
-                {:else}
-                  all rows
-                {/if}
-              </td>
-            </tr>
-          </tbody>
-        </Table>
-      </Stack>
-    {/if}
-  </details>
-</Accordion>
+              <tr>
+                <th>To</th>
+                <td>{to}</td>
+              </tr>
+              {#if cc}
+                <tr>
+                  <th>CC</th>
+                  <td>{cc}</td>
+                </tr>
+              {/if}
+              {#if bcc}
+                <tr>
+                  <th>BCC</th>
+                  <td>{bcc}</td>
+                </tr>
+              {/if}
+              <tr>
+                <th>Subject</th>
+                <td>
+                  {#if subjectManagedByDraft}
+                    From selected Gmail draft
+                  {:else}
+                    {subject}
+                  {/if}
+                </td>
+              </tr>
+              <tr>
+                <th>Receipt Tracking</th>
+                <td>{trackReceipt ? "enabled" : "disabled"}</td>
+              </tr>
+              <tr>
+                <th>Auto Check</th>
+                <td>{trackReceipt && autoCheckReceipts ? "hourly" : "off"}</td>
+              </tr>
+              <tr>
+                <th>Merge Rows</th>
+                <td>
+                  {#if useMergeIf}
+                    conditional using {mergeCondition.doCustomFormula
+                      ? "custom formula"
+                      : `${mergeCondition.selectedHeader} ${mergeCondition.selectedCondition}`}
+                  {:else}
+                    all rows
+                  {/if}
+                </td>
+              </tr>
+            </tbody>
+          </Table>
+        </Stack>
+      {/if}
+    </details>
+  </Accordion>
+</FormProvider>

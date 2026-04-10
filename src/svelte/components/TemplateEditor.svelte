@@ -32,6 +32,7 @@
     previewRows = [],
     previewRowNumbers = [],
     showOpenEditorButton = true,
+    openEditorDisabled = false,
     warningReport = {
       missingFields: [],
       suspiciousPlaceholders: [],
@@ -48,6 +49,7 @@
     previewRows?: SerializableCellValue[][];
     previewRowNumbers?: number[];
     showOpenEditorButton?: boolean;
+    openEditorDisabled?: boolean;
     warningReport?: TemplateWarningReport;
     mode?: "sidebar" | "editor";
     onOpenEditor?: () => void;
@@ -779,7 +781,9 @@
     <Inline wrap="wrap" --inline-gap="16px">
       {#if mode === "sidebar"}
         {#if showOpenEditorButton}
-          <Button onclick={onOpenEditor}>Edit Template</Button>
+          <Button onclick={onOpenEditor} disabled={openEditorDisabled}>
+            Edit Template
+          </Button>
         {/if}
         <Toggle bind:checked={previewOverride}>
           {#snippet onLabel()}

@@ -57,6 +57,13 @@
   --heading-fg: var(--brand-fg);
   --tab-active-fg: var(--material-color-pink-900);
 
+  /* Progress bars... */
+  --progress-bar-color: var(--material-color-pink-300);
+  --progress-track-bg: var(--material-color-pink-50);
+  --progress-track-stripe-bg: var(--material-color-pink-100);
+  --progress-fg: var(--material-color-pink-900);
+  --progress-font-weight: bold;
+
   /* Tabs */
   /* --tab-bg: var(--material-color-purple-100);
   --tab-fg: var(--material-color-purple-800);
